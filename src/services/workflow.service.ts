@@ -1,7 +1,7 @@
 import { ref, set, push, update, get } from 'firebase/database';
 import { db } from '@/core/config/firebase';
 import { ALLOWED_TRANSITIONS, type WorkflowState } from '@/core/constants/workflowStates';
-import { updateInventoryStock, getCampInventory } from '@/services/master.service';
+import { updateInventoryStock } from '@/services/master.service';
 import type { UserProfile } from '@/types/auth.types';
 import type { DonationRequest } from '@/types/request.types';
 
