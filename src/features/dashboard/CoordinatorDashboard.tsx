@@ -12,7 +12,9 @@ import { ROUTES } from '@/core/constants/routes';
 import { subscribeCampInventory, subscribeCamps } from '@/services/master.service';
 import type { CampInventory, Camp } from '@/types/master.types';
 
-const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'];
+import { CLINICAL_BLOOD_GROUPS } from '@/core/utils/bloodUtils';
+
+const BLOOD_GROUPS = CLINICAL_BLOOD_GROUPS.map((g) => g.value);
 
 export function CoordinatorDashboard() {
   const { userProfile } = useAuth();

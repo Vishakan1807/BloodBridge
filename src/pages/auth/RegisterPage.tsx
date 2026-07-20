@@ -10,6 +10,8 @@ import { Select, type SelectOption } from '@/components/ui/Select';
 import { Button } from '@/components/ui/Button';
 import { ROUTES } from '@/core/constants/routes';
 
+import { CLINICAL_BLOOD_GROUPS } from '@/core/utils/bloodUtils';
+
 function parseFirebaseError(code: string): string {
   const map: Record<string, string> = {
     'auth/email-already-in-use':   'This email is already registered. Please sign in.',
@@ -44,12 +46,10 @@ export default function RegisterPage() {
   const [errors,   setErrors]   = useState<FormErrors>({});
   const [showPwd,  setShowPwd]  = useState(false);
   const [loading,  setLoading]  = useState(false);
-  const DEFAULT_BLOOD_GROUPS: SelectOption[] = [
-    { value: 'A+', label: 'A+' }, { value: 'A-', label: 'A-' },
-    { value: 'B+', label: 'B+' }, { value: 'B-', label: 'B-' },
-    { value: 'O+', label: 'O+' }, { value: 'O-', label: 'O-' },
-    { value: 'AB+', label: 'AB+' }, { value: 'AB-', label: 'AB-' },
-  ];
+  const DEFAULT_BLOOD_GROUPS: SelectOption[] = CLINICAL_BLOOD_GROUPS.map((g) => ({
+    value: g.value,
+    label: `${g.label}${g.category !== 'standard' ? ' 🌟' : ''}`,
+  }));
 
   const [bgOptions, setBgOptions] = useState<SelectOption[]>(DEFAULT_BLOOD_GROUPS);
 
