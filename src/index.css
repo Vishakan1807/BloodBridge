@@ -1,0 +1,185 @@
+/* ============================================================
+   BloodBridge — Global Styles & Design System
+   Tailwind CSS v4 @theme tokens
+   ============================================================ */
+
+@import 'tailwindcss';
+@import '@fontsource-variable/inter';
+@import '@fontsource/outfit/300.css';
+@import '@fontsource/outfit/400.css';
+@import '@fontsource/outfit/700.css';
+
+@theme {
+  /* ── Brand Palette ─────────────────────────────────────── */
+  --color-brand-50:   #fff1f2;
+  --color-brand-100:  #ffe4e6;
+  --color-brand-200:  #fecdd3;
+  --color-brand-400:  #fb7185;
+  --color-brand-500:  #e11d48;
+  --color-brand-600:  #be123c;
+  --color-brand-700:  #9f1239;
+  --color-brand-800:  #881337;
+
+  /* ── Surface Palette (dark-first) ──────────────────────── */
+  --color-surface-950: #0a0608;
+  --color-surface-900: #0f0a0b;
+  --color-surface-800: #1a1015;
+  --color-surface-700: #261820;
+  --color-surface-600: #341f29;
+  --color-surface-200: #f3e8ea;
+  --color-surface-100: #fdf2f4;
+
+  /* ── Semantic Colors ────────────────────────────────────── */
+  --color-success:      #22c55e;
+  --color-success-dim:  #14532d;
+  --color-warning:      #f59e0b;
+  --color-warning-dim:  #451a03;
+  --color-danger:       #ef4444;
+  --color-danger-dim:   #450a0a;
+  --color-info:         #3b82f6;
+  --color-info-dim:     #1e3a8a;
+  --color-neutral:      #94a3b8;
+  --color-muted:        #64748b;
+
+  /* ── Typography ─────────────────────────────────────────── */
+  --font-sans:    'Inter Variable', system-ui, sans-serif;
+  --font-display: 'Outfit', system-ui, sans-serif;
+  --font-mono:    'JetBrains Mono', ui-monospace, monospace;
+
+  /* ── Border Radius ──────────────────────────────────────── */
+  --radius-sm:  0.25rem;
+  --radius-md:  0.5rem;
+  --radius-lg:  0.75rem;
+  --radius-xl:  1rem;
+  --radius-2xl: 1.25rem;
+
+  /* ── Shadows ────────────────────────────────────────────── */
+  --shadow-card:  0 1px 3px rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.6);
+  --shadow-modal: 0 20px 60px rgba(0,0,0,0.8);
+  --shadow-glow:  0 0 20px rgba(225, 29, 72, 0.15);
+}
+
+/* ── Base Reset ─────────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 16px;
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--color-surface-900);
+  color: #f1f5f9;
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  line-height: 1.5;
+  min-height: 100vh;
+}
+
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Skip link (Accessibility) ──────────────────────────────── */
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  background: var(--color-brand-500);
+  color: white;
+  padding: 8px 16px;
+  z-index: 9999;
+  font-size: 0.875rem;
+  font-weight: 600;
+  transition: top 0.2s;
+}
+.skip-link:focus {
+  top: 0;
+}
+
+/* ── Focus Ring (Global) ────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--color-brand-500);
+  outline-offset: 2px;
+}
+
+/* ── Scrollbar Styling ──────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-surface-800);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-surface-600);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-brand-700);
+}
+
+/* ── Utility Classes ────────────────────────────────────────── */
+.font-display {
+  font-family: var(--font-display);
+}
+
+.font-mono {
+  font-family: var(--font-mono);
+}
+
+/* Skeleton shimmer animation */
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--color-surface-700) 25%,
+    var(--color-surface-600) 50%,
+    var(--color-surface-700) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: var(--radius-md);
+}
+
+/* Count-up animation utility */
+@keyframes count-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.animate-count-up {
+  animation: count-up 0.6s ease-out forwards;
+}
+
+/* Page fade-in */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.page-enter {
+  animation: fade-in 0.2s ease-out forwards;
+}
+
+/* Pulse glow for workflow current state */
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(225, 29, 72, 0.4); }
+  50%       { box-shadow: 0 0 0 6px rgba(225, 29, 72, 0); }
+}
+
+.pulse-glow {
+  animation: pulse-glow 2s infinite;
+}
