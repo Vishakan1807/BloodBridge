@@ -13,7 +13,6 @@ function ComingSoon({ page }: { page: string }) {
   );
 }
 
-export const UserManagementPage   = () => <ComingSoon page="User Management" />;
 export const RoleAssignmentPage   = () => <ComingSoon page="Role Assignment" />;
 export const AuditLogPage         = () => <ComingSoon page="Audit Log" />;
 export const SystemSettingsPage   = () => <ComingSoon page="System Settings" />;

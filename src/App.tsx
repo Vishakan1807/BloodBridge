@@ -32,8 +32,9 @@ import { MatchingPage }       from '@/pages/workflow/MatchingPage';
 import { SummaryReportPage }  from '@/pages/reports/SummaryReportPage';
 import { StatusReportPage }   from '@/pages/reports/StatusReportPage';
 import { ActivityReportPage } from '@/pages/reports/ActivityReportPage';
+import { UserManagementPage } from '@/pages/admin/UserManagementPage';
 import {
-  UserManagementPage, RoleAssignmentPage, AuditLogPage, SystemSettingsPage,
+  RoleAssignmentPage, AuditLogPage, SystemSettingsPage,
   DonorHistoryPage,
 } from '@/pages/stubs';
 
