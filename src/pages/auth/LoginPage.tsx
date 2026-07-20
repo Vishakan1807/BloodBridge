@@ -5,6 +5,7 @@ import { useAuth } from '@/core/context/AuthContext';
 import { useToast } from '@/core/context/ToastContext';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
+import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { ROUTES } from '@/core/constants/routes';
 
 // ── Firebase error → human-readable message ───────────────────
@@ -78,7 +79,11 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-surface-950 flex">
+    <div className="min-h-screen bg-surface-950 flex relative">
+      {/* Top Right Theme Switcher */}
+      <div className="absolute top-5 right-5 z-20">
+        <ThemeToggle />
+      </div>
       {/* ── Left: Brand Hero ──────────────────────────────── */}
       <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden
                       bg-gradient-to-br from-surface-900 via-brand-800/20 to-surface-950

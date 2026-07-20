@@ -8,6 +8,7 @@ import {
 import { AuthProvider, useAuth } from '@/core/context/AuthContext';
 import { RBACProvider }           from '@/core/context/RBACContext';
 import { ToastProvider }          from '@/core/context/ToastContext';
+import { ThemeProvider }          from '@/core/context/ThemeContext';
 import { AuthGuard }              from '@/core/guards/AuthGuard';
 import { RoleGuard }              from '@/core/guards/RoleGuard';
 import { ErrorBoundary }          from '@/components/feedback/ErrorBoundary';
@@ -110,16 +111,18 @@ const router = createBrowserRouter([
 // ── App Root ──────────────────────────────────────────────────
 function AppProviders() {
   return (
-    <AuthProvider>
-      <RBACProvider>
-        <ToastProvider>
-          <ErrorBoundary>
-            <RouterProvider router={router} />
-            <ToastContainer />
-          </ErrorBoundary>
-        </ToastProvider>
-      </RBACProvider>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <RBACProvider>
+          <ToastProvider>
+            <ErrorBoundary>
+              <RouterProvider router={router} />
+              <ToastContainer />
+            </ErrorBoundary>
+          </ToastProvider>
+        </RBACProvider>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
 

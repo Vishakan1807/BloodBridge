@@ -1,6 +1,7 @@
 import React from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import { Menu } from 'lucide-react';
+import { ThemeToggle } from '@/components/ui/ThemeToggle';
 
 interface HeaderProps {
   onMenuClick: () => void;
@@ -52,7 +53,7 @@ export function Header({ onMenuClick }: HeaderProps) {
   const breadcrumbs = buildBreadcrumbs(location.pathname);
 
   return (
-    <header className="sticky top-0 z-20 bg-surface-800/80 backdrop-blur-md border-b border-surface-700 px-6 py-4">
+    <header className="sticky top-0 z-20 bg-surface-800/80 backdrop-blur-md border-b border-surface-700 px-6 py-4 flex items-center justify-between">
       <div className="flex items-center gap-4">
         {/* Hamburger — mobile only */}
         <button
@@ -86,6 +87,9 @@ export function Header({ onMenuClick }: HeaderProps) {
           ))}
         </nav>
       </div>
+
+      {/* Global Theme Toggle */}
+      <ThemeToggle />
     </header>
   );
 }
