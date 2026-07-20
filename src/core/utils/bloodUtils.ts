@@ -27,4 +27,7 @@ export const CLINICAL_BLOOD_GROUPS: BloodGroupConfig[] = [
   // Ultra-Rare Life-Saving Phenotypes
   { value: 'Bombay', label: 'Bombay Blood Group (hh / Oh)', category: 'ultra_rare', description: 'Extremely rare phenotype lacking H antigen' },
   { value: 'Rh-null',label: 'Rh-null (Golden Blood)',       category: 'ultra_rare', description: 'Universal donor for all Rh-deficient patients' },
+
+  // Non-Individual / Organizational Account Option
+  { value: 'N/A - Camp', label: 'N/A — Blood Camp / Organization', category: 'standard', description: 'For Camp Coordinator & Organizational accounts' },
 ];
