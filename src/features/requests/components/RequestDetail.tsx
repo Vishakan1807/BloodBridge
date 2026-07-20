@@ -1,19 +1,31 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Edit, Calendar, Hospital, User, Phone, FileText, MessageSquare, Paperclip } from 'lucide-react';
+import { ArrowLeft, Edit, Hospital, ShieldCheck, Target, CheckCircle2, AlertCircle } from 'lucide-react';
 import { useRequestDetail } from '../hooks/useRequestDetail';
 import { useAuth } from '@/core/context/AuthContext';
+import { useToast } from '@/core/context/ToastContext';
 import { WorkflowTimeline } from './WorkflowTimeline';
+import { CommentThread } from '@/features/comments/CommentThread';
+import { AttachmentPanel } from '@/features/attachments/AttachmentPanel';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
+import { Modal } from '@/components/ui/Modal';
 import { STATE_CONFIG } from '@/core/constants/workflowStates';
+import { transitionWorkflowState } from '@/services/workflow.service';
 import { NotFoundPage } from '@/components/feedback/PageError';
 
 export function RequestDetail() {
   const { id } = useParams<{ id: string }>();
   const { request, loading } = useRequestDetail(id);
   const { userProfile } = useAuth();
+  const { showSuccess, showError } = useToast();
   const navigate = useNavigate();
+
+  // Workflow Transition Modal States
+  const [closeModalOpen, setCloseModalOpen] = useState(false);
+  const [closureNotes, setClosureNotes] = useState('');
+  const [transitioning, setTransitioning] = useState(false);
 
   if (loading) {
     return (
@@ -31,9 +43,43 @@ export function RequestDetail() {
 
   const isOwner = userProfile?.uid === request.createdBy;
   const isAdmin = userProfile?.role === 'admin';
+  const isManager = userProfile?.role === 'manager';
   const canEdit = (isOwner || isAdmin) && request.status === 'registered';
 
   const stateCfg = STATE_CONFIG[request.status];
+
+  // Workflow Action Handlers
+  async function handleRecordDonation() {
+    if (!userProfile || !request) return;
+    setTransitioning(true);
+    try {
+      await transitionWorkflowState(request.id, 'donated', userProfile);
+      showSuccess(`Donation event recorded for request ${request.referenceNumber}! Stock decremented.`);
+    } catch (err: any) {
+      showError(err?.message || 'Failed to record donation.');
+    } finally {
+      setTransitioning(false);
+    }
+  }
+
+  async function handleConfirmClose() {
+    if (!userProfile || !request || !closureNotes.trim()) {
+      showError('Mandatory closure notes required.');
+      return;
+    }
+    setTransitioning(true);
+    try {
+      await transitionWorkflowState(request.id, 'closed', userProfile, {
+        closureNotes: closureNotes.trim(),
+      });
+      showSuccess(`Request ${request.referenceNumber} closed successfully.`);
+      setCloseModalOpen(false);
+    } catch (err: any) {
+      showError(err?.message || 'Failed to close request.');
+    } finally {
+      setTransitioning(false);
+    }
+  }
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto page-enter">
@@ -46,13 +92,58 @@ export function RequestDetail() {
           <ArrowLeft size={16} /> Back to Requests
         </button>
 
-        {canEdit && (
-          <Link to={`/requests/${request.id}/edit`}>
-            <Button variant="secondary" size="sm" icon={<Edit size={16} />}>
-              Edit Request
-            </Button>
-          </Link>
-        )}
+        <div className="flex items-center gap-3">
+          {canEdit && (
+            <Link to={`/requests/${request.id}/edit`}>
+              <Button variant="secondary" size="sm" icon={<Edit size={16} />}>
+                Edit Request
+              </Button>
+            </Link>
+          )}
+
+          {/* Workflow Actions for Manager / Admin */}
+          {(isManager || isAdmin) && (
+            <>
+              {request.status === 'registered' && (
+                <Link to="/workflow/verify">
+                  <Button variant="primary" size="sm" icon={<ShieldCheck size={16} />}>
+                    Go to Verification Queue
+                  </Button>
+                </Link>
+              )}
+
+              {request.status === 'verified' && (
+                <Link to="/workflow/match">
+                  <Button variant="primary" size="sm" icon={<Target size={16} />}>
+                    Go to Matching Console
+                  </Button>
+                </Link>
+              )}
+
+              {request.status === 'matched' && (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  loading={transitioning}
+                  onClick={handleRecordDonation}
+                  icon={<CheckCircle2 size={16} />}
+                >
+                  Record Donation (Deduct Stock)
+                </Button>
+              )}
+
+              {request.status === 'donated' && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setCloseModalOpen(true)}
+                >
+                  Close Request Case
+                </Button>
+              )}
+            </>
+          )}
+        </div>
       </div>
 
       {/* Main Request Info Card */}
@@ -113,6 +204,12 @@ export function RequestDetail() {
                 {new Date(request.requiredByDate).toLocaleDateString()}
               </span>
             </div>
+            {request.matchedDonorName && (
+              <div className="flex justify-between pt-2 border-t border-surface-700">
+                <span className="text-muted">Matched Donor:</span>
+                <span className="font-semibold text-success">{request.matchedDonorName}</span>
+              </div>
+            )}
           </div>
 
           {request.notes && (
@@ -143,28 +240,57 @@ export function RequestDetail() {
                 <p className="font-semibold text-slate-200 text-sm">{request.campName}</p>
               </div>
             )}
+
+            {request.closureNotes && (
+              <div className="pt-2 border-t border-surface-700">
+                <span className="text-muted text-xs">Case Closure Notes:</span>
+                <p className="text-xs text-slate-300 italic">{request.closureNotes}</p>
+              </div>
+            )}
           </div>
         </Card>
       </div>
 
-      {/* Placeholders for Comments & Attachments (Modules 6 & 7 on Day 4) */}
+      {/* Embedded Comments & Attachments Modules */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card padding="md">
-          <div className="flex items-center gap-2 mb-3">
-            <MessageSquare size={18} className="text-brand-400" />
-            <h3 className="font-display font-semibold text-base text-white">Comments</h3>
-          </div>
-          <p className="text-xs text-muted">Comments thread active in Day 4 (Workflow & Discussion Module).</p>
+          <CommentThread requestId={request.id} />
         </Card>
 
         <Card padding="md">
-          <div className="flex items-center gap-2 mb-3">
-            <Paperclip size={18} className="text-brand-400" />
-            <h3 className="font-display font-semibold text-base text-white">Attachments</h3>
-          </div>
-          <p className="text-xs text-muted">Prescription & Medical document attachments active in Day 4.</p>
+          <AttachmentPanel requestId={request.id} />
         </Card>
       </div>
+
+      {/* Close Request Case Modal */}
+      <Modal
+        isOpen={closeModalOpen}
+        onClose={() => setCloseModalOpen(false)}
+        title={`Close Request Case — ${request.referenceNumber}`}
+      >
+        <div className="space-y-4">
+          <p className="text-xs text-slate-300">
+            Closing this case marks the transaction lifecycle complete. Mandatory closure notes are required.
+          </p>
+
+          <Input
+            label="Mandatory Closure Notes"
+            placeholder="e.g. Donation completed successfully at Red Cross Camp."
+            value={closureNotes}
+            onChange={(e) => setClosureNotes(e.target.value)}
+            required
+          />
+
+          <div className="flex justify-end gap-3 pt-4 border-t border-surface-700">
+            <Button variant="ghost" onClick={() => setCloseModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="primary" onClick={handleConfirmClose} loading={transitioning}>
+              Confirm Case Closure
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }
