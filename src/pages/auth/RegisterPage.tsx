@@ -44,27 +44,29 @@ export default function RegisterPage() {
   const [errors,   setErrors]   = useState<FormErrors>({});
   const [showPwd,  setShowPwd]  = useState(false);
   const [loading,  setLoading]  = useState(false);
-  const [bgOptions, setBgOptions] = useState<SelectOption[]>([]);
+  const DEFAULT_BLOOD_GROUPS: SelectOption[] = [
+    { value: 'A+', label: 'A+' }, { value: 'A-', label: 'A-' },
+    { value: 'B+', label: 'B+' }, { value: 'B-', label: 'B-' },
+    { value: 'O+', label: 'O+' }, { value: 'O-', label: 'O-' },
+    { value: 'AB+', label: 'AB+' }, { value: 'AB-', label: 'AB-' },
+  ];
 
-  // Load blood groups from Firebase master data
+  const [bgOptions, setBgOptions] = useState<SelectOption[]>(DEFAULT_BLOOD_GROUPS);
+
+  // Load blood groups from Firebase master data if available, fallback to defaults
   useEffect(() => {
     get(ref(db, 'master/bloodGroups')).then((snap) => {
       if (snap.exists()) {
         const groups = Object.values(snap.val()) as { label: string; isActive: boolean }[];
-        setBgOptions(
-          groups
-            .filter((g) => g.isActive)
-            .map((g) => ({ value: g.label, label: g.label })),
-        );
+        const active = groups
+          .filter((g) => g.isActive)
+          .map((g) => ({ value: g.label, label: g.label }));
+        if (active.length > 0) {
+          setBgOptions(active);
+        }
       }
     }).catch(() => {
-      // Fall back to hardcoded options if master data not yet seeded
-      setBgOptions([
-        { value: 'A+', label: 'A+' }, { value: 'A-', label: 'A-' },
-        { value: 'B+', label: 'B+' }, { value: 'B-', label: 'B-' },
-        { value: 'O+', label: 'O+' }, { value: 'O-', label: 'O-' },
-        { value: 'AB+', label: 'AB+' }, { value: 'AB-', label: 'AB-' },
-      ]);
+      // Keep defaults on fetch failure
     });
   }, []);
 

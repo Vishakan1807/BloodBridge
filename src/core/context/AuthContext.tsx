@@ -77,7 +77,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
     });
 
-    return unsubscribe;
+    // Safety timeout to guarantee app renders even if Firebase is unreachable
+    const timer = setTimeout(() => {
+      setLoading(false);
+    }, 1500);
+
+    return () => {
+      unsubscribe();
+      clearTimeout(timer);
+    };
   }, []);
 
   // ── Auth Methods ───────────────────────────────────────────
