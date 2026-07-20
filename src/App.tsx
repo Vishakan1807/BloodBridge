@@ -33,9 +33,9 @@ import { SummaryReportPage }  from '@/pages/reports/SummaryReportPage';
 import { StatusReportPage }   from '@/pages/reports/StatusReportPage';
 import { ActivityReportPage } from '@/pages/reports/ActivityReportPage';
 import { UserManagementPage } from '@/pages/admin/UserManagementPage';
+import { DonorHistoryPage }    from '@/pages/donor/DonorHistoryPage';
 import {
   RoleAssignmentPage, AuditLogPage, SystemSettingsPage,
-  DonorHistoryPage,
 } from '@/pages/stubs';
 
 // ── Redirect-if-auth wrapper for public routes ────────────────
