@@ -23,8 +23,11 @@ import DashboardPage      from '@/pages/DashboardPage';
 import { BloodGroupsPage } from '@/pages/master/BloodGroupsPage';
 import { CampsPage }       from '@/pages/master/CampsPage';
 import { HospitalsPage }   from '@/pages/master/HospitalsPage';
+import { RequestListPage }   from '@/pages/requests/RequestListPage';
+import { RequestCreatePage } from '@/pages/requests/RequestCreatePage';
+import { RequestDetailPage } from '@/pages/requests/RequestDetailPage';
+import { RequestEditPage }   from '@/pages/requests/RequestEditPage';
 import {
-  RequestListPage, RequestCreatePage, RequestDetailPage, RequestEditPage,
   VerificationPage, MatchingPage,
   SummaryReportPage, StatusReportPage, ActivityReportPage,
   UserManagementPage, RoleAssignmentPage, AuditLogPage, SystemSettingsPage,

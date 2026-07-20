@@ -13,10 +13,6 @@ function ComingSoon({ page }: { page: string }) {
   );
 }
 
-export const RequestListPage      = () => <ComingSoon page="Donation Requests" />;
-export const RequestCreatePage    = () => <ComingSoon page="New Request" />;
-export const RequestDetailPage    = () => <ComingSoon page="Request Detail" />;
-export const RequestEditPage      = () => <ComingSoon page="Edit Request" />;
 export const VerificationPage     = () => <ComingSoon page="Verify Donors" />;
 export const MatchingPage         = () => <ComingSoon page="Match Donors" />;
 export const SummaryReportPage    = () => <ComingSoon page="Summary Report" />;
