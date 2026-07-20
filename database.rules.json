@@ -1,0 +1,54 @@
+{
+  "rules": {
+    "users": {
+      ".read": "auth != null",
+      "$uid": {
+        ".write": "auth != null && (auth.uid === $uid || root.child('users').child(auth.uid).child('role').val() === 'admin')"
+      }
+    },
+    "master": {
+      ".read": "auth != null",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() === 'admin'"
+    },
+    "requests": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "workflow": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "inventory": {
+      ".read": "auth != null",
+      ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'manager')"
+    },
+    "comments": {
+      "$requestId": {
+        ".read": "auth != null",
+        "$commentId": {
+          ".write": "auth != null && !data.exists()"
+        }
+      }
+    },
+    "attachments": {
+      "$requestId": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      }
+    },
+    "donorHistory": {
+      "$donorUid": {
+        ".read": "auth != null && (auth.uid === $donorUid || root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'manager')",
+        ".write": "auth != null"
+      }
+    },
+    "audit": {
+      ".read": "auth != null && root.child('users').child(auth.uid).child('role').val() === 'admin'",
+      ".write": "auth != null"
+    },
+    "meta": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    }
+  }
+}
