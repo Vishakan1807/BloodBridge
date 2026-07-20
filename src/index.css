@@ -46,15 +46,15 @@
   --color-text-muted:  #94a3b8;
 }
 
-/* 2. Light (Clinical Light) */
+/* 2. Light (Soft Clinical - Subdued & Eye-Friendly) */
 [data-theme="light"] {
-  --color-surface-950: #f1f5f9;
-  --color-surface-900: #f8fafc;
-  --color-surface-800: #ffffff;
-  --color-surface-700: #e2e8f0;
-  --color-surface-600: #cbd5e1;
-  --color-text-main:   #0f172a;
-  --color-text-muted:  #64748b;
+  --color-surface-950: #e2e8f0;
+  --color-surface-900: #eef2f6;
+  --color-surface-800: #f8fafc;
+  --color-surface-700: #cbd5e1;
+  --color-surface-600: #94a3b8;
+  --color-text-main:   #1e293b;
+  --color-text-muted:  #475569;
 }
 
 /* 3. Moderate (Slate Navy) */
