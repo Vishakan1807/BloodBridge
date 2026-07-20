@@ -7,7 +7,7 @@ import React, {
   type ReactNode,
 } from 'react';
 
-export type Theme = 'dark' | 'light' | 'moderate';
+export type Theme = 'dark' | 'light' | 'emerald';
 
 interface ThemeContextValue {
   theme:      Theme;
