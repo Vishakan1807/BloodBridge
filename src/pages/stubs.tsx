@@ -13,7 +13,6 @@ function ComingSoon({ page }: { page: string }) {
   );
 }
 
-export const MatchingPage         = () => <ComingSoon page="Match Donors" />;
 export const SummaryReportPage    = () => <ComingSoon page="Summary Report" />;
 export const StatusReportPage     = () => <ComingSoon page="Status Report" />;
 export const ActivityReportPage   = () => <ComingSoon page="Activity Report" />;

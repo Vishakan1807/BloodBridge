@@ -28,8 +28,8 @@ import { RequestCreatePage } from '@/pages/requests/RequestCreatePage';
 import { RequestDetailPage } from '@/pages/requests/RequestDetailPage';
 import { RequestEditPage }   from '@/pages/requests/RequestEditPage';
 import { VerificationPage }   from '@/pages/workflow/VerificationPage';
+import { MatchingPage }       from '@/pages/workflow/MatchingPage';
 import {
-  MatchingPage,
   SummaryReportPage, StatusReportPage, ActivityReportPage,
   UserManagementPage, RoleAssignmentPage, AuditLogPage, SystemSettingsPage,
   DonorHistoryPage,
