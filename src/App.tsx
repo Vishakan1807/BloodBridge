@@ -29,8 +29,10 @@ import { RequestDetailPage } from '@/pages/requests/RequestDetailPage';
 import { RequestEditPage }   from '@/pages/requests/RequestEditPage';
 import { VerificationPage }   from '@/pages/workflow/VerificationPage';
 import { MatchingPage }       from '@/pages/workflow/MatchingPage';
+import { SummaryReportPage }  from '@/pages/reports/SummaryReportPage';
+import { StatusReportPage }   from '@/pages/reports/StatusReportPage';
+import { ActivityReportPage } from '@/pages/reports/ActivityReportPage';
 import {
-  SummaryReportPage, StatusReportPage, ActivityReportPage,
   UserManagementPage, RoleAssignmentPage, AuditLogPage, SystemSettingsPage,
   DonorHistoryPage,
 } from '@/pages/stubs';
