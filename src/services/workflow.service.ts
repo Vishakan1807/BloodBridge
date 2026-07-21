@@ -27,8 +27,9 @@ export async function transitionWorkflowState(
   const fromState = request.status;
 
   // ── WF-G02: Role Enforcement ─────────────────────────────────
-  if (actor.role === 'user' && toState !== 'registered') {
-    throw new Error('Donors cannot advance workflow lifecycle states.');
+  // Users can only register OR close their own donated requests (blood received)
+  if (actor.role === 'user' && toState !== 'registered' && toState !== 'closed') {
+    throw new Error('Donors can only raise requests or confirm blood received (close).');
   }
 
   // ── WF-G01: Allowed Transitions & No Skipping States ─────────

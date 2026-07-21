@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Edit, Hospital, ShieldCheck, Target, CheckCircle2, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Edit, Hospital, ShieldCheck, Target, CheckCircle2, AlertCircle, PackageCheck, Clock } from 'lucide-react';
 import { useRequestDetail } from '../hooks/useRequestDetail';
 import { useAuth } from '@/core/context/AuthContext';
 import { useToast } from '@/core/context/ToastContext';
@@ -23,9 +23,17 @@ export function RequestDetail() {
   const navigate = useNavigate();
 
   // Workflow Transition Modal States
-  const [closeModalOpen, setCloseModalOpen] = useState(false);
-  const [closureNotes, setClosureNotes] = useState('');
-  const [transitioning, setTransitioning] = useState(false);
+  const [closeModalOpen, setCloseModalOpen]   = useState(false);
+  const [closureNotes, setClosureNotes]         = useState('');
+  const [transitioning, setTransitioning]       = useState(false);
+
+  // Stale request detection: donated but not closed for > 3 days
+  const STALE_DAYS = 3;
+  const donatedAt  = (request as any)?.donatedAt as number | null;
+  const staleDays  = donatedAt
+    ? Math.floor((Date.now() - donatedAt) / (1000 * 60 * 60 * 24))
+    : 0;
+  const isStale    = request?.status === 'donated' && staleDays >= STALE_DAYS;
 
   if (loading) {
     return (
@@ -115,33 +123,34 @@ export function RequestDetail() {
               {request.status === 'verified' && (
                 <Link to="/workflow/match">
                   <Button variant="primary" size="sm" icon={<Target size={16} />}>
-                    Go to Matching Console
+                    Go to Fulfillment Status
                   </Button>
                 </Link>
-              )}
-
-              {request.status === 'matched' && (
-                <Button
-                  variant="primary"
-                  size="sm"
-                  loading={transitioning}
-                  onClick={handleRecordDonation}
-                  icon={<CheckCircle2 size={16} />}
-                >
-                  Record Donation (Deduct Stock)
-                </Button>
               )}
 
               {request.status === 'donated' && (
                 <Button
                   variant="secondary"
                   size="sm"
+                  icon={<CheckCircle2 size={16} />}
                   onClick={() => setCloseModalOpen(true)}
                 >
                   Close Request Case
                 </Button>
               )}
             </>
+          )}
+
+          {/* Donor: Confirm Blood Received & Close */}
+          {isOwner && request.status === 'donated' && (
+            <Button
+              variant="primary"
+              size="sm"
+              icon={<PackageCheck size={16} />}
+              onClick={() => setCloseModalOpen(true)}
+            >
+              ✅ Confirm Blood Received & Close
+            </Button>
           )}
         </div>
       </div>
@@ -276,20 +285,48 @@ export function RequestDetail() {
         </Card>
       </div>
 
+      {/* Stale Request Warning Banner */}
+      {isStale && (isOwner || isAdmin || isManager) && (
+        <div className="flex items-start gap-3 bg-warning/10 border border-warning/30 rounded-xl p-4">
+          <Clock size={18} className="text-warning shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-semibold text-warning">Blood delivered but case not closed</p>
+            <p className="text-xs text-muted mt-0.5">
+              This request has been in <strong>Donated</strong> status for <strong>{staleDays} day{staleDays !== 1 ? 's' : ''}</strong>.
+              {isOwner
+                ? ' If you have received the blood units, please close the case below.'
+                : ' Please follow up with the recipient or close the case.'}
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Close Request Case Modal */}
       <Modal
         isOpen={closeModalOpen}
         onClose={() => setCloseModalOpen(false)}
-        title={`Close Request Case — ${request.referenceNumber}`}
+        title={isOwner && !isAdmin && !isManager
+          ? `Confirm Blood Received — ${request.referenceNumber}`
+          : `Close Request Case — ${request.referenceNumber}`
+        }
       >
         <div className="space-y-4">
-          <p className="text-xs text-slate-300">
-            Closing this case marks the transaction lifecycle complete. Mandatory closure notes are required.
-          </p>
+          {isOwner && !isAdmin && !isManager ? (
+            <div className="bg-success/10 border border-success/30 rounded-xl p-3 text-xs text-slate-300">
+              <p className="font-semibold text-success mb-1">✅ Confirm Blood Received</p>
+              <p>Please confirm that you have received all {request.unitsRequired} unit(s) of <strong>{request.requiredBloodGroup}</strong> blood for {request.patientName}. This will close the case and mark it as complete.</p>
+            </div>
+          ) : (
+            <p className="text-xs text-slate-300">
+              Closing this case marks the transaction lifecycle complete. Mandatory closure notes are required.
+            </p>
+          )}
 
           <Input
-            label="Mandatory Closure Notes"
-            placeholder="e.g. Donation completed successfully at Red Cross Camp."
+            label={isOwner && !isAdmin && !isManager ? 'Confirmation Notes (e.g. Blood received at hospital)' : 'Mandatory Closure Notes'}
+            placeholder={isOwner && !isAdmin && !isManager
+              ? 'e.g. All 3 units received at Apollo Hospital. Transfusion completed.'
+              : 'e.g. Donation completed successfully at Red Cross Camp.'}
             value={closureNotes}
             onChange={(e) => setClosureNotes(e.target.value)}
             required
@@ -300,7 +337,7 @@ export function RequestDetail() {
               Cancel
             </Button>
             <Button variant="primary" onClick={handleConfirmClose} loading={transitioning}>
-              Confirm Case Closure
+              {isOwner && !isAdmin && !isManager ? 'Confirm & Close Case' : 'Confirm Case Closure'}
             </Button>
           </div>
         </div>

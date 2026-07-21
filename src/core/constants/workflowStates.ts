@@ -27,7 +27,7 @@ export const ALLOWED_TRANSITIONS: Record<WorkflowState, AllowedTransition[]> = {
     { toState: 'donated', allowedRoles: ['manager', 'admin'] },
   ],
   donated: [
-    { toState: 'closed', allowedRoles: ['manager', 'admin'], requiresNote: true },
+    { toState: 'closed', allowedRoles: ['user', 'manager', 'admin'], requiresNote: true },
   ],
   closed: [
     // Admin-only emergency rollback

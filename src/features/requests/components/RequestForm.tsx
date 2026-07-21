@@ -162,14 +162,29 @@ export function RequestForm({ initialData, isEditMode = false }: RequestFormProp
             required
           />
 
-          <Input
-            label="Required By Date"
-            type="date"
-            value={requiredByDate}
-            onChange={(e) => setRequiredByDate(e.target.value)}
-            icon={<Calendar size={16} />}
-            required
-          />
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-slate-300">
+              Required By Date <span className="text-brand-400">*</span>
+            </label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none">
+                <Calendar size={16} />
+              </span>
+              <input
+                type="date"
+                value={requiredByDate}
+                min={new Date().toISOString().split('T')[0]}
+                onChange={(e) => setRequiredByDate(e.target.value)}
+                required
+                className="w-full bg-surface-700 border border-surface-600 rounded-lg text-sm text-slate-100 pl-10 pr-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition-all duration-150 [color-scheme:dark]"
+              />
+            </div>
+            {requiredByDate && (
+              <p className="text-xs text-muted">
+                📅 {new Date(requiredByDate + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+              </p>
+            )}
+          </div>
         </div>
 
         {hospitals.length === 0 ? (
