@@ -1,7 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { Shield, Users, Check, X, Search, Edit2 } from 'lucide-react';
-import { ref, get, push, set, update } from 'firebase/database';
-import { db } from '@/core/config/firebase';
 import { useAuth } from '@/core/context/AuthContext';
 import { useToast } from '@/core/context/ToastContext';
 import { listUsers, setRole } from '@/services/user.service';
@@ -44,39 +42,7 @@ export function RoleAssignmentPage() {
     try {
       await setRole(targetUser.uid, selectedRole);
 
-      // Auto-create a dedicated Blood Bank / Camp entry when a user is set as Manager (new or existing)
-      if (selectedRole === 'manager') {
-        // Check if a camp already exists for this user
-        const campsSnap = await get(ref(db, 'master/camps'));
-        const existingCamp = campsSnap.exists()
-          ? Object.values(campsSnap.val() as Record<string, any>).find(
-              (c: any) => c.coordinatorUid === targetUser.uid || c.id === targetUser.campId,
-            )
-          : null;
-
-        if (!existingCamp) {
-          const campName = targetUser.displayName.includes('Camp') || targetUser.displayName.includes('Bank')
-            ? targetUser.displayName
-            : `${targetUser.displayName} Blood Bank`;
-
-          const newCampRef = push(ref(db, 'master/camps'));
-          const newCampId = newCampRef.key!;
-          await set(newCampRef, {
-            id:             newCampId,
-            name:           campName,
-            address:        targetUser.city ? `${targetUser.city} Blood Bank` : 'Blood Bank',
-            city:           targetUser.city || 'Chennai',
-            phone:          targetUser.phone || '',
-            coordinatorUid: targetUser.uid,
-            isActive:       true,
-            createdBy:      currentUser?.uid || 'admin',
-            createdAt:      Date.now(),
-          });
-          await update(ref(db, `users/${targetUser.uid}`), { campId: newCampId });
-        }
-      }
-
-      showSuccess(`Updated role for ${targetUser.displayName} to ${ROLE_LABELS[selectedRole]}. Blood bank camp auto-provisioned.`);
+      showSuccess(`Role updated: ${targetUser.displayName} is now ${ROLE_LABELS[selectedRole]}.`);
       setTargetUser(null);
       loadUsers();
     } catch (err: any) {

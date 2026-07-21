@@ -89,14 +89,17 @@ export function CampsPage() {
           coordinatorUid: coordinatorUid || null,
         });
 
-        // Link user profile campId
+        // Link coordinator: set role to manager + assign campId
         if (coordinatorUid) {
           const { ref: fRef, update: fUpdate } = await import('firebase/database');
           const { db: fDb } = await import('@/core/config/firebase');
-          await fUpdate(fRef(fDb, `users/${coordinatorUid}`), { campId: editingCamp.id });
+          await fUpdate(fRef(fDb, `users/${coordinatorUid}`), {
+            campId: editingCamp.id,
+            role: 'manager',
+          });
         }
 
-        showSuccess(`Camp ${name} updated.`);
+        showSuccess(`Blood Bank "${name}" updated. Coordinator auto-assigned as Camp Manager.`);
       } else {
         const newCampId = await createCamp({
           name: name.trim(),
@@ -108,14 +111,17 @@ export function CampsPage() {
           createdBy: userProfile?.uid ?? '',
         });
 
-        // Link user profile campId
+        // Link coordinator: set role to manager + assign campId
         if (coordinatorUid && newCampId) {
           const { ref: fRef, update: fUpdate } = await import('firebase/database');
           const { db: fDb } = await import('@/core/config/firebase');
-          await fUpdate(fRef(fDb, `users/${coordinatorUid}`), { campId: newCampId });
+          await fUpdate(fRef(fDb, `users/${coordinatorUid}`), {
+            campId: newCampId,
+            role: 'manager',
+          });
         }
 
-        showSuccess(`Camp ${name} created.`);
+        showSuccess(`Blood Bank "${name}" created. Coordinator auto-assigned as Camp Manager.`);
       }
       setModalOpen(false);
     } catch (err: any) {
