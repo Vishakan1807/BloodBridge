@@ -34,8 +34,10 @@ export async function createRequest(
     createdBy:          user.uid,
     donorName:          user.displayName || 'Anonymous Donor',
     donorBloodGroup:    user.bloodGroup || dto.requiredBloodGroup,
+    donorCity:          user.city || '',     // Used for city-based broadcast
     requiredBloodGroup: dto.requiredBloodGroup,
     unitsRequired:      dto.unitsRequired,
+    unitsFulfilled:     0,                  // Tracks partial donations progress
     urgency:            dto.urgency,
     hospitalId:         dto.hospitalId,
     hospitalName:       dto.hospitalName,
@@ -47,6 +49,7 @@ export async function createRequest(
     campName:           null,
     matchedDonorUid:    null,
     matchedDonorName:   null,
+    partialDonations:   [],
     donatedAt:          null,
     closureNotes:       null,
     createdAt:          now,

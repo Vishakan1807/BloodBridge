@@ -3,8 +3,9 @@ import { db } from '@/core/config/firebase';
 import { ALLOWED_TRANSITIONS, type WorkflowState } from '@/core/constants/workflowStates';
 import { updateInventoryStock } from '@/services/master.service';
 import type { UserProfile } from '@/types/auth.types';
-import type { DonationRequest } from '@/types/request.types';
+import type { DonationRequest, PartialDonation } from '@/types/request.types';
 
+// ── Standard Workflow State Transition ────────────────────────
 export async function transitionWorkflowState(
   requestId: string,
   toState: WorkflowState,
@@ -48,11 +49,11 @@ export async function transitionWorkflowState(
   }
 
   // ── WF-G04: Inventory Auto-Decrement on DONATED ─────────────
+  // (Only for non-broadcast requests that used old single/multi-camp flow)
   if (fromState === 'matched' && toState === 'donated') {
     const allocations = request.allocations || extraData?.allocations;
 
     if (allocations && allocations.length > 0) {
-      // Multi-camp deduction
       for (const alloc of allocations) {
         const invSnap = await get(ref(db, `inventory/${alloc.campId}/${request.requiredBloodGroup}`));
         const currentStock = invSnap.exists() ? invSnap.val().units || 0 : 0;
@@ -61,36 +62,20 @@ export async function transitionWorkflowState(
             `Insufficient stock in ${alloc.campName}! Available: ${currentStock} u, Required: ${alloc.units} u.`,
           );
         }
-        await updateInventoryStock(
-          alloc.campId,
-          request.requiredBloodGroup,
-          currentStock - alloc.units,
-          actor.uid,
-        );
+        await updateInventoryStock(alloc.campId, request.requiredBloodGroup, currentStock - alloc.units, actor.uid);
       }
     } else {
-      // Single camp deduction
       const targetCampId = extraData?.campId || request.campId;
-      if (!targetCampId) throw new Error('Processing camp is required to record donation.');
-
-      const invSnap = await get(ref(db, `inventory/${targetCampId}/${request.requiredBloodGroup}`));
-      const currentStock = invSnap.exists() ? invSnap.val().units || 0 : 0;
-
-      if (currentStock < request.unitsRequired) {
-        throw new Error(
-          `Insufficient inventory stock in camp! Available: ${currentStock} units, Required: ${request.unitsRequired} units.`,
-        );
+      if (targetCampId && targetCampId !== 'broadcast') {
+        const invSnap = await get(ref(db, `inventory/${targetCampId}/${request.requiredBloodGroup}`));
+        const currentStock = invSnap.exists() ? invSnap.val().units || 0 : 0;
+        if (currentStock < request.unitsRequired) {
+          throw new Error(`Insufficient inventory! Available: ${currentStock} u, Required: ${request.unitsRequired} u.`);
+        }
+        await updateInventoryStock(targetCampId, request.requiredBloodGroup, currentStock - request.unitsRequired, actor.uid);
       }
-
-      await updateInventoryStock(
-        targetCampId,
-        request.requiredBloodGroup,
-        currentStock - request.unitsRequired,
-        actor.uid,
-      );
     }
 
-    // Update Donor History index for Trainer Extension
     if (request.matchedDonorUid) {
       const donorHistRef = ref(db, `donorHistory/${request.matchedDonorUid}/${requestId}`);
       await set(donorHistRef, {
@@ -109,7 +94,7 @@ export async function transitionWorkflowState(
   // Prepare Request Updates
   const now = Date.now();
   const updates: Partial<DonationRequest> = {
-    status: toState,
+    status:    toState,
     updatedAt: now,
   };
 
@@ -117,16 +102,15 @@ export async function transitionWorkflowState(
   if (extraData?.campName)     updates.campName = extraData.campName;
   if (extraData?.allocations)  updates.allocations = extraData.allocations;
   if (extraData?.matchedDonor) {
-    updates.matchedDonorUid = extraData.matchedDonor.uid;
+    updates.matchedDonorUid  = extraData.matchedDonor.uid;
     updates.matchedDonorName = extraData.matchedDonor.name;
   }
   if (toState === 'donated') updates.donatedAt = now;
   if (extraData?.closureNotes) updates.closureNotes = extraData.closureNotes;
 
-  // Execute Request Status Update
   await update(reqRef, updates);
 
-  // Write Workflow History Entry
+  // Workflow History
   const wfHistRef = push(ref(db, `workflow/${requestId}`));
   await set(wfHistRef, {
     fromState,
@@ -138,10 +122,10 @@ export async function transitionWorkflowState(
     timestamp: now,
   });
 
-  // Write System Audit Trail Entry
+  // Audit Trail
   const auditRef = push(ref(db, 'audit'));
   await set(auditRef, {
-    id: auditRef.key,
+    id:            auditRef.key,
     type:          'WORKFLOW',
     action:        `TRANSITION_${toState.toUpperCase()}`,
     actorUid:      actor.uid,
@@ -155,27 +139,25 @@ export async function transitionWorkflowState(
     timestamp:     now,
   });
 
-  // ── Dispatch Automated Email & SMS Notifications ───────────
+  // Automated Email & SMS Notifications
   try {
     const { sendNotification } = await import('@/services/notification.service');
-    const { getProfile } = await import('@/services/user.service');
+    const { getProfile }       = await import('@/services/user.service');
 
-    // 1. Notify Requester
     if (request.createdBy) {
       const requester = await getProfile(request.createdBy);
       if (requester) {
-        let title = `Request ${request.referenceNumber} Status Updated`;
-        let message = `Your request for ${request.patientName} (${request.requiredBloodGroup}) transitioned from ${fromState.toUpperCase()} to ${toState.toUpperCase()}.`;
+        let title   = `Request ${request.referenceNumber} Status Updated`;
+        let message = `Your request for ${request.patientName} (${request.requiredBloodGroup}) moved to ${toState.toUpperCase()}.`;
 
-        if (toState === 'matched') {
-          const matchedLocation = extraData?.campName || updates.matchedDonorName || 'Assigned Blood Camp';
-          title = `🩸 [BloodBridge Alert] Donor/Stock Matched for ${request.referenceNumber}!`;
-          message = `Great news! Your blood request ${request.referenceNumber} for ${request.patientName} (${request.requiredBloodGroup}) is MATCHED at ${matchedLocation}. Please collect the blood units for transfusion at ${request.hospitalName}.`;
+        if (toState === 'verified') {
+          title   = `✅ [BloodBridge] Request ${request.referenceNumber} Verified`;
+          message = `Your blood request for ${request.patientName} (${request.requiredBloodGroup}, ${request.unitsRequired} units) has been verified and broadcast to blood banks in ${request.donorCity || 'your city'}. You will be notified when units are allocated.`;
         } else if (toState === 'donated') {
-          title = `💉 [BloodBridge Alert] Donation Recorded for ${request.referenceNumber}`;
-          message = `Blood units for ${request.patientName} have been recorded as donated/dispatched from ${request.campName || 'Camp'}.`;
+          title   = `💉 [BloodBridge] Blood Units Fully Allocated — ${request.referenceNumber}`;
+          message = `All ${request.unitsRequired} unit(s) of ${request.requiredBloodGroup} for ${request.patientName} have been allocated by blood banks. Please collect from the respective blood banks for transfusion at ${request.hospitalName}.`;
         } else if (toState === 'closed') {
-          title = `🔒 [BloodBridge Alert] Case Closed — ${request.referenceNumber}`;
+          title   = `🔒 [BloodBridge] Case Closed — ${request.referenceNumber}`;
           message = `Request ${request.referenceNumber} has been successfully closed. Notes: "${extraData?.closureNotes || 'Case completed.'}"`;
         }
 
@@ -192,18 +174,142 @@ export async function transitionWorkflowState(
         });
       }
     }
+  } catch (notifErr) {
+    console.error('Failed to dispatch notification:', notifErr);
+  }
+}
 
-    // 2. If Matched Individual Donor exists, notify matched donor as well
-    if (toState === 'matched' && extraData?.matchedDonor?.uid && !extraData.matchedDonor.uid.startsWith('inventory-')) {
-      const matchedDonorProfile = await getProfile(extraData.matchedDonor.uid);
-      if (matchedDonorProfile) {
+// ── Partial Donation by Camp Coordinator (First-Come-First-Serve) ─────────────
+export async function partialDonate(
+  requestId: string,
+  actor:     UserProfile,
+  campId:    string,
+  campName:  string,
+  units:     number,
+): Promise<{ fulfilled: boolean; unitsFulfilled: number }> {
+  const reqRef = ref(db, `requests/${requestId}`);
+  const snapshot = await get(reqRef);
+  if (!snapshot.exists()) throw new Error('Request not found.');
+
+  const request = snapshot.val() as DonationRequest;
+
+  // Only allow donation on broadcast-verified requests
+  if (request.status !== 'verified') {
+    throw new Error(`Cannot donate — request is in ${request.status.toUpperCase()} state, not VERIFIED.`);
+  }
+
+  const alreadyFulfilled = request.unitsFulfilled || 0;
+  const stillNeeded      = request.unitsRequired - alreadyFulfilled;
+
+  if (stillNeeded <= 0) {
+    throw new Error('This request is already fully fulfilled by other blood banks.');
+  }
+
+  if (units <= 0 || units > stillNeeded) {
+    throw new Error(`You can donate between 1 and ${stillNeeded} units for this request.`);
+  }
+
+  // Check camp inventory
+  const invSnap     = await get(ref(db, `inventory/${campId}/${request.requiredBloodGroup}`));
+  const campStock   = invSnap.exists() ? invSnap.val().units || 0 : 0;
+
+  if (campStock < units) {
+    throw new Error(`Insufficient stock! Your camp has ${campStock} unit(s) of ${request.requiredBloodGroup}, but ${units} requested.`);
+  }
+
+  // Check if this camp already donated to this request
+  const existingDonations = request.partialDonations || [];
+  const alreadyDonatedByThisCamp = existingDonations.find((d) => d.campId === campId);
+  if (alreadyDonatedByThisCamp) {
+    throw new Error(`Your blood bank has already donated ${alreadyDonatedByThisCamp.units} unit(s) to this request.`);
+  }
+
+  // Deduct from camp inventory
+  await updateInventoryStock(campId, request.requiredBloodGroup, campStock - units, actor.uid);
+
+  // Record this donation
+  const newDonation: PartialDonation = {
+    campId,
+    campName,
+    units,
+    donatedAt: Date.now(),
+    donatedBy: actor.uid,
+  };
+
+  const newPartialDonations = [...existingDonations, newDonation];
+  const newUnitsFulfilled   = alreadyFulfilled + units;
+  const fullyFulfilled      = newUnitsFulfilled >= request.unitsRequired;
+
+  const now = Date.now();
+
+  // Build updates for the request
+  const updates: Partial<DonationRequest> & Record<string, any> = {
+    partialDonations: newPartialDonations,
+    unitsFulfilled:   newUnitsFulfilled,
+    updatedAt:        now,
+  };
+
+  // If fully fulfilled → auto-transition to 'donated'
+  if (fullyFulfilled) {
+    updates.status    = 'donated' as WorkflowState;
+    updates.donatedAt = now;
+    // Build combined campName summary
+    updates.campName  = newPartialDonations.map((d) => `${d.campName} (${d.units}u)`).join(', ');
+  }
+
+  await update(reqRef, updates);
+
+  // Workflow history entry
+  const wfHistRef = push(ref(db, `workflow/${requestId}`));
+  await set(wfHistRef, {
+    fromState: 'verified',
+    toState:   fullyFulfilled ? 'donated' : 'verified',
+    actorUid:  actor.uid,
+    actorName: actor.displayName,
+    actorRole: actor.role,
+    note:      `${campName} donated ${units} unit(s) of ${request.requiredBloodGroup}. Total fulfilled: ${newUnitsFulfilled}/${request.unitsRequired}.`,
+    timestamp: now,
+  });
+
+  // Audit entry
+  const auditRef = push(ref(db, 'audit'));
+  await set(auditRef, {
+    id:            auditRef.key,
+    type:          'PARTIAL_DONATION',
+    action:        'CAMP_PARTIAL_DONATE',
+    actorUid:      actor.uid,
+    actorName:     actor.displayName,
+    actorRole:     actor.role,
+    targetId:      requestId,
+    targetType:    'request',
+    previousValue: { unitsFulfilled: alreadyFulfilled },
+    newValue:      { unitsFulfilled: newUnitsFulfilled, campId, campName, units },
+    metadata:      { referenceNumber: request.referenceNumber },
+    timestamp:     now,
+  });
+
+  // Notify requester about partial donation
+  try {
+    const { sendNotification } = await import('@/services/notification.service');
+    const { getProfile }       = await import('@/services/user.service');
+
+    if (request.createdBy) {
+      const requester = await getProfile(request.createdBy);
+      if (requester) {
+        const title = fullyFulfilled
+          ? `💉 [BloodBridge] All Units Allocated — ${request.referenceNumber}`
+          : `🩸 [BloodBridge] Partial Donation — ${request.referenceNumber}`;
+        const message = fullyFulfilled
+          ? `All ${request.unitsRequired} unit(s) of ${request.requiredBloodGroup} for ${request.patientName} are now fully allocated! Collect from the respective blood banks for transfusion at ${request.hospitalName}.`
+          : `${campName} has donated ${units} unit(s) of ${request.requiredBloodGroup} for ${request.patientName}. ${newUnitsFulfilled} of ${request.unitsRequired} units fulfilled so far. ${stillNeeded - units} unit(s) still needed.`;
+
         await sendNotification({
-          recipientUid:   matchedDonorProfile.uid,
-          recipientEmail: matchedDonorProfile.email,
-          recipientPhone: matchedDonorProfile.phone,
-          recipientName:  matchedDonorProfile.displayName,
-          title:          `🩸 Urgent Match Confirmation — ${request.referenceNumber}`,
-          message:        `You have been matched as a donor for request ${request.referenceNumber} (${request.patientName}, ${request.requiredBloodGroup}) at ${request.hospitalName}. Please report to ${extraData.campName || 'the assigned blood camp'}.`,
+          recipientUid:   requester.uid,
+          recipientEmail: requester.email,
+          recipientPhone: requester.phone,
+          recipientName:  requester.displayName,
+          title,
+          message,
           channel:        'both',
           requestId,
           refNumber:      request.referenceNumber,
@@ -211,7 +317,8 @@ export async function transitionWorkflowState(
       }
     }
   } catch (notifErr) {
-    // Log error without breaking workflow state transition
-    console.error('Failed to dispatch notification:', notifErr);
+    console.error('Notification dispatch failed:', notifErr);
   }
+
+  return { fulfilled: fullyFulfilled, unitsFulfilled: newUnitsFulfilled };
 }

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { User, Mail, Lock, Eye, EyeOff, Phone, MapPin, Droplets } from 'lucide-react';
+import { User, Mail, Lock, Eye, EyeOff, Phone, Droplets } from 'lucide-react';
 import { get, ref } from 'firebase/database';
 import { db } from '@/core/config/firebase';
 import { useAuth } from '@/core/context/AuthContext';
@@ -12,6 +12,9 @@ import { ROUTES } from '@/core/constants/routes';
 import { checkEmailExists } from '@/services/user.service';
 
 import { CLINICAL_BLOOD_GROUPS } from '@/core/utils/bloodUtils';
+import { CITY_OPTIONS } from '@/core/constants/indianCities';
+
+const cityOptions = CITY_OPTIONS;
 
 function parseFirebaseError(code: string): string {
   const map: Record<string, string> = {
@@ -237,16 +240,16 @@ export default function RegisterPage() {
             />
 
             <div className="grid grid-cols-2 gap-4">
-              <Input
+              <Select
                 id="reg-city"
-                type="text"
                 label="City"
-                placeholder="Mumbai"
+                options={[
+                  { value: '', label: 'Select your city...' },
+                  ...cityOptions,
+                ]}
                 value={form.city}
                 onChange={(e) => setField('city', e.target.value)}
-                onBlur={validate}
                 error={errors.city}
-                icon={<MapPin size={16} />}
                 required
               />
               <Select
