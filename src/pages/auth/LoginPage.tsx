@@ -20,11 +20,11 @@ function parseFirebaseError(code: string): string {
   return map[code] ?? 'Unable to sign in. Please check your email or register a new account.';
 }
 
-// ── Stats for the hero panel ──────────────────────────────────
+// ── Highlights for the hero panel ──────────────────────────────
 const HERO_STATS = [
-  { value: '2,400+', label: 'Verified Donors' },
-  { value: '380+',   label: 'Active Camps' },
-  { value: '12,000+',label: 'Lives Saved' },
+  { value: 'Real-Time',  label: 'City Broadcast Network' },
+  { value: 'First-Come', label: 'FCFS Smart Allocation' },
+  { value: 'Instant',    label: 'Email & SMS Alerts' },
 ];
 
 export default function LoginPage() {

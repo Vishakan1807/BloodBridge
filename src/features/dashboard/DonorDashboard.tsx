@@ -88,7 +88,7 @@ export function DonorDashboard() {
             Hello, {userProfile?.displayName ?? 'Donor'}! 🩸
           </h1>
           <p className="text-muted text-sm mt-1">
-            Blood Group: <span className="font-semibold text-brand-400">{userProfile?.bloodGroup ?? 'Not Set'}</span> · Status: {userProfile?.isVerified ? 'Verified Donor ✅' : 'Pending Verification ⏳'}
+            Blood Group: <span className="font-semibold text-brand-400">{userProfile?.bloodGroup ?? 'Not Set'}</span> · Account Status: <span className="text-success font-semibold">Active Donor 🩸</span>
           </p>
         </div>
 
