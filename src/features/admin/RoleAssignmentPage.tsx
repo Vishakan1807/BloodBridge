@@ -44,8 +44,8 @@ export function RoleAssignmentPage() {
     try {
       await setRole(targetUser.uid, selectedRole);
 
-      // Auto-create a dedicated Blood Bank / Camp entry when a user is promoted to Manager
-      if (selectedRole === 'manager' && targetUser.role !== 'manager') {
+      // Auto-create a dedicated Blood Bank / Camp entry when a user is set as Manager (new or existing)
+      if (selectedRole === 'manager') {
         // Check if a camp already exists for this user
         const campsSnap = await get(ref(db, 'master/camps'));
         const existingCamp = campsSnap.exists()
