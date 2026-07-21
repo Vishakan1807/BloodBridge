@@ -64,3 +64,13 @@ export async function setRole(
 export async function setActive(uid: string, isActive: boolean): Promise<void> {
   await update(ref(db, `users/${uid}`), { isActive, updatedAt: Date.now() });
 }
+
+// ── Check if email exists in database ─────────────────────────
+export async function checkEmailExists(email: string): Promise<boolean> {
+  if (!email || !email.includes('@')) return false;
+  const snapshot = await get(ref(db, 'users'));
+  if (!snapshot.exists()) return false;
+  const users = Object.values(snapshot.val()) as UserProfile[];
+  const normalized = email.trim().toLowerCase();
+  return users.some((u) => u.email && u.email.trim().toLowerCase() === normalized);
+}

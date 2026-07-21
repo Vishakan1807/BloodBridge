@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/Input';
 import { Select, type SelectOption } from '@/components/ui/Select';
 import { Button } from '@/components/ui/Button';
 import { ROUTES } from '@/core/constants/routes';
+import { checkEmailExists } from '@/services/user.service';
 
 import { CLINICAL_BLOOD_GROUPS } from '@/core/utils/bloodUtils';
 
@@ -37,7 +38,7 @@ interface FormErrors extends Partial<FormState> {}
 
 export default function RegisterPage() {
   const { signUp } = useAuth();
-  const { showError, showSuccess } = useToast();
+  const { showError, showSuccess, showWarning } = useToast();
   const navigate = useNavigate();
 
   const [form,     setForm]     = useState<FormState>({
@@ -73,6 +74,29 @@ export default function RegisterPage() {
 
   function setField(field: keyof FormState, value: string) {
     setForm((prev) => ({ ...prev, [field]: value }));
+  }
+
+  async function handleEmailBlur() {
+    if (!form.email) return;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
+      setErrors((prev) => ({ ...prev, email: 'Enter a valid email.' }));
+      return;
+    }
+
+    try {
+      const exists = await checkEmailExists(form.email);
+      if (exists) {
+        setErrors((prev) => ({
+          ...prev,
+          email: 'This email ID already exists in our system. Please sign in instead.',
+        }));
+        showWarning('This email ID is already registered. Please click "Sign in" below to log into your account.');
+      } else {
+        setErrors((prev) => ({ ...prev, email: undefined }));
+      }
+    } catch {
+      // Ignore network errors during background blur check
+    }
   }
 
   function validate(): boolean {
@@ -159,8 +183,10 @@ export default function RegisterPage() {
               label="Email address"
               placeholder="you@example.com"
               value={form.email}
-              onChange={(e) => setField('email', e.target.value)}
-              onBlur={validate}
+              onChange={(e) => {
+                setForm((prev) => ({ ...prev, email: e.target.value }));
+              }}
+              onBlur={handleEmailBlur}
               error={errors.email}
               icon={<Mail size={16} />}
               autoComplete="email"
