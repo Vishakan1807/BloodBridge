@@ -1,18 +1,27 @@
 import React, { useEffect, useState } from 'react';
-import { Target, User, CheckCircle2, Clock, AlertTriangle, ArrowRight, Droplet, Building2 } from 'lucide-react';
+import { Target, User, CheckCircle2, Clock, AlertTriangle, ArrowRight, Droplet, Building2, Layers } from 'lucide-react';
+import { ref, onValue } from 'firebase/database';
+import { db } from '@/core/config/firebase';
 import { useAuth } from '@/core/context/AuthContext';
 import { useToast } from '@/core/context/ToastContext';
 import { useRequests } from '@/features/requests/hooks/useRequests';
 import { listUsers } from '@/services/user.service';
-import { subscribeCampInventory, subscribeCamps } from '@/services/master.service';
+import { subscribeCamps } from '@/services/master.service';
 import { transitionWorkflowState } from '@/services/workflow.service';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import type { UserProfile } from '@/types/auth.types';
-import type { DonationRequest } from '@/types/request.types';
-import type { CampInventory, Camp } from '@/types/master.types';
+import type { DonationRequest, CampAllocation } from '@/types/request.types';
+import type { Camp } from '@/types/master.types';
 import { isBloodCompatible } from '@/core/utils/bloodUtils';
+
+interface CampStockInfo {
+  campId:   string;
+  campName: string;
+  city:     string;
+  units:    number;
+}
 
 export function MatchingConsole() {
   const { userProfile } = useAuth();
@@ -23,7 +32,7 @@ export function MatchingConsole() {
 
   // Selected Request & Match Modal
   const [selectedReq, setSelectedReq] = useState<DonationRequest | null>(null);
-  const [campInventory, setCampInventory] = useState<CampInventory>({});
+  const [allCampStocks, setAllCampStocks] = useState<CampStockInfo[]>([]);
   const [matching, setMatching] = useState(false);
 
   useEffect(() => {
@@ -35,17 +44,35 @@ export function MatchingConsole() {
     });
   }, []);
 
-  // Listen to live inventory for selected request's camp
+  // Listen to live inventory across ALL camps when a request is selected
   useEffect(() => {
-    if (!selectedReq) {
-      setCampInventory({});
+    if (!selectedReq || camps.length === 0) {
+      setAllCampStocks([]);
       return;
     }
-    const campId = selectedReq.campId || (camps.length > 0 ? camps[0].id : '');
-    if (!campId) return;
 
-    return subscribeCampInventory(campId, (inv) => {
-      setCampInventory(inv);
+    const invRef = ref(db, 'inventory');
+    return onValue(invRef, (snapshot) => {
+      if (!snapshot.exists()) {
+        setAllCampStocks([]);
+        return;
+      }
+      const data = snapshot.val() as Record<string, Record<string, { units: number }>>;
+      const stocks: CampStockInfo[] = [];
+
+      for (const camp of camps) {
+        const campInv = data[camp.id];
+        const bgUnits = campInv?.[selectedReq.requiredBloodGroup]?.units || 0;
+        if (bgUnits > 0) {
+          stocks.push({
+            campId:   camp.id,
+            campName: camp.name,
+            city:     camp.city,
+            units:    bgUnits,
+          });
+        }
+      }
+      setAllCampStocks(stocks);
     });
   }, [selectedReq, camps]);
 
@@ -73,21 +100,20 @@ export function MatchingConsole() {
     }
   }
 
-  // Match / Fulfill from Live Camp Inventory Stock
-  async function handleConfirmInventoryMatch(availableUnits: number) {
+  // Single Camp Allocation
+  async function handleConfirmSingleCampMatch(campId: string, campName: string, availableUnits: number) {
     if (!selectedReq || !userProfile) return;
-    const campName = selectedReq.campName || 'Camp Inventory';
 
     setMatching(true);
     try {
       await transitionWorkflowState(selectedReq.id, 'matched', userProfile, {
-        campId:   selectedReq.campId || undefined,
-        campName: selectedReq.campName || undefined,
+        campId,
+        campName,
         matchedDonor: {
-          uid:  `inventory-${selectedReq.campId || 'default'}`,
+          uid:  `inventory-${campId}`,
           name: `Live Camp Inventory Stock (${campName})`,
         },
-        note: `Allocated ${selectedReq.unitsRequired} unit(s) of ${selectedReq.requiredBloodGroup} from ${campName} live stock (Available: ${availableUnits} units).`,
+        note: `Allocated ${selectedReq.unitsRequired} unit(s) of ${selectedReq.requiredBloodGroup} from ${campName} stock.`,
       });
       showSuccess(`Allocated ${selectedReq.unitsRequired} unit(s) of ${selectedReq.requiredBloodGroup} from ${campName} stock!`);
       setSelectedReq(null);
@@ -98,15 +124,63 @@ export function MatchingConsole() {
     }
   }
 
+  // Multi-Camp Split Stock Allocation
+  async function handleConfirmMultiCampMatch(allocations: CampAllocation[]) {
+    if (!selectedReq || !userProfile) return;
+
+    const summaryStr = allocations.map((a) => `${a.campName}: ${a.units}u`).join(', ');
+
+    setMatching(true);
+    try {
+      await transitionWorkflowState(selectedReq.id, 'matched', userProfile, {
+        allocations,
+        campId:   allocations[0].campId,
+        campName: `Multi-Camp Inventory (${summaryStr})`,
+        matchedDonor: {
+          uid:  'multi-camp-inventory',
+          name: `Multi-Camp Inventory Stock (${summaryStr})`,
+        },
+        note: `Allocated total ${selectedReq.unitsRequired} units of ${selectedReq.requiredBloodGroup} across multiple camps: ${summaryStr}`,
+      });
+      showSuccess(`Allocated ${selectedReq.unitsRequired} units of ${selectedReq.requiredBloodGroup} across multiple camps!`);
+      setSelectedReq(null);
+    } catch (err: any) {
+      showError(err?.message || 'Multi-camp allocation failed.');
+    } finally {
+      setMatching(false);
+    }
+  }
+
+  // Calculate split allocations across multiple camps to fulfill required units
+  function computeMultiCampAllocations(neededUnits: number): CampAllocation[] {
+    let remaining = neededUnits;
+    const allocations: CampAllocation[] = [];
+
+    for (const c of allCampStocks) {
+      if (remaining <= 0) break;
+      const allocatedUnits = Math.min(remaining, c.units);
+      if (allocatedUnits > 0) {
+        allocations.push({
+          campId:   c.campId,
+          campName: c.campName,
+          units:    allocatedUnits,
+        });
+        remaining -= allocatedUnits;
+      }
+    }
+    return allocations;
+  }
+
   // Filter compatible donors for selected request
   const compatibleDonors = selectedReq
     ? allDonors.filter((d) => isBloodCompatible(d.bloodGroup || '', selectedReq.requiredBloodGroup))
     : [];
 
-  // Check inventory stock for selected request
-  const stockItem = selectedReq ? campInventory[selectedReq.requiredBloodGroup] : undefined;
-  const availableStockUnits = stockItem?.units || 0;
-  const hasSufficientStock = availableStockUnits >= (selectedReq?.unitsRequired || 1);
+  // Stock calculations for selected request
+  const totalCombinedStock = allCampStocks.reduce((sum, c) => sum + c.units, 0);
+  const unitsNeeded = selectedReq?.unitsRequired || 1;
+  const multiCampAllocations = selectedReq ? computeMultiCampAllocations(unitsNeeded) : [];
+  const hasFullMultiCampStock = totalCombinedStock >= unitsNeeded;
 
   return (
     <div className="space-y-6 page-enter">
@@ -114,10 +188,10 @@ export function MatchingConsole() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-surface-800 border border-surface-600/40 rounded-2xl p-6">
         <div>
           <h1 className="font-display font-bold text-2xl text-white flex items-center gap-2">
-            <Target className="text-warning" /> Donor & Inventory Matching Console
+            <Target className="text-warning" /> Donor & Multi-Camp Inventory Matching Console
           </h1>
           <p className="text-muted text-sm mt-1">
-            Match verified requests to live camp inventory stock or compatible registered donors
+            Match verified requests via single/multi-camp inventory allocation or registered donors
           </p>
         </div>
 
@@ -203,7 +277,6 @@ export function MatchingConsole() {
             <div>
               <p className="text-muted">Target Patient & Destination:</p>
               <p className="font-semibold text-white text-sm">{selectedReq?.patientName} @ {selectedReq?.hospitalName}</p>
-              <p className="text-muted mt-0.5">Processing Camp: <span className="text-slate-200">{selectedReq?.campName || 'Default Camp'}</span></p>
             </div>
             <div className="text-right">
               <p className="text-muted">Blood Required:</p>
@@ -211,47 +284,88 @@ export function MatchingConsole() {
             </div>
           </div>
 
-          {/* Option 1: Live Camp Stock Inventory Allocation */}
-          <div className="space-y-2">
+          {/* Option 1: Multi-Camp & Single-Camp Stock Allocation */}
+          <div className="space-y-3">
             <h3 className="font-display font-semibold text-xs text-muted uppercase tracking-wider flex items-center gap-1.5">
-              <Droplet size={14} className="text-brand-400" /> Option 1: Live Camp Inventory Stock
+              <Droplet size={14} className="text-brand-400" /> Option 1: Camp Inventory Stock Allocation
             </h3>
 
-            <div className={`p-4 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
-              hasSufficientStock
-                ? 'bg-success/10 border-success/30'
-                : availableStockUnits > 0
-                ? 'bg-warning/10 border-warning/30'
-                : 'bg-surface-700/40 border-surface-600/40'
-            }`}>
-              <div>
-                <p className="font-semibold text-white text-sm flex items-center gap-2">
-                  <span>{selectedReq?.campName || 'Assigned Camp Inventory'}</span>
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                    availableStockUnits > 0 ? 'bg-success/20 text-success' : 'bg-surface-700 text-muted'
-                  }`}>
-                    {availableStockUnits} units in stock
-                  </span>
-                </p>
-                <p className="text-xs text-muted mt-0.5">
-                  {hasSufficientStock
-                    ? `Sufficient stock available! Fulfill ${selectedReq?.unitsRequired} unit(s) of ${selectedReq?.requiredBloodGroup} directly from inventory.`
-                    : availableStockUnits > 0
-                    ? `Partial stock available (${availableStockUnits} / ${selectedReq?.unitsRequired} units needed).`
-                    : `No ${selectedReq?.requiredBloodGroup} units currently in camp stock.`}
-                </p>
-              </div>
+            {/* Multi-Camp Split Allocation Banner (If multiple camps are required to fulfill total units) */}
+            {allCampStocks.length > 1 && hasFullMultiCampStock && (
+              <div className="p-4 bg-brand-500/10 border border-brand-500/30 rounded-xl space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-semibold text-white text-sm flex items-center gap-2">
+                      <Layers size={16} className="text-brand-400" />
+                      Multi-Camp Split Allocation Available!
+                    </p>
+                    <p className="text-xs text-muted mt-0.5">
+                      Fulfill <strong className="text-brand-400">{unitsNeeded} units</strong> of {selectedReq?.requiredBloodGroup} by combining stock from multiple camps:
+                    </p>
+                  </div>
 
-              <Button
-                variant={hasSufficientStock ? 'primary' : 'secondary'}
-                size="sm"
-                disabled={availableStockUnits === 0}
-                loading={matching}
-                onClick={() => handleConfirmInventoryMatch(availableStockUnits)}
-              >
-                Allocate Camp Stock
-              </Button>
-            </div>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    loading={matching}
+                    onClick={() => handleConfirmMultiCampMatch(multiCampAllocations)}
+                  >
+                    Fulfill via Split Allocation
+                  </Button>
+                </div>
+
+                {/* Split Allocation breakdown */}
+                <div className="bg-surface-900/60 p-3 rounded-lg border border-surface-700/60 text-xs space-y-1.5">
+                  <p className="text-muted font-medium">Split Allocation Breakdown:</p>
+                  {multiCampAllocations.map((alloc) => (
+                    <div key={alloc.campId} className="flex justify-between text-slate-200">
+                      <span>• {alloc.campName}:</span>
+                      <strong className="text-brand-400">{alloc.units} unit(s)</strong>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Individual Camp Stock Cards */}
+            {allCampStocks.length === 0 ? (
+              <div className="text-center py-5 text-muted text-xs bg-surface-700/30 rounded-xl border border-surface-600/30">
+                No camps currently have {selectedReq?.requiredBloodGroup} in stock.
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {allCampStocks.map((c) => {
+                  const isSufficient = c.units >= unitsNeeded;
+                  return (
+                    <div
+                      key={c.campId}
+                      className="p-3 bg-surface-700/50 rounded-xl border border-surface-600/50 flex items-center justify-between"
+                    >
+                      <div>
+                        <p className="font-semibold text-white text-sm flex items-center gap-2">
+                          <span>{c.campName} ({c.city})</span>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            isSufficient ? 'bg-success/20 text-success' : 'bg-warning/20 text-warning'
+                          }`}>
+                            {c.units} u in stock
+                          </span>
+                        </p>
+                      </div>
+
+                      <Button
+                        variant={isSufficient ? 'primary' : 'secondary'}
+                        size="sm"
+                        disabled={c.units === 0}
+                        loading={matching}
+                        onClick={() => handleConfirmSingleCampMatch(c.campId, c.campName, c.units)}
+                      >
+                        {isSufficient ? 'Allocate Full Stock' : `Allocate ${Math.min(c.units, unitsNeeded)} u`}
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* Option 2: Compatible Registered Donors */}
@@ -265,7 +379,7 @@ export function MatchingConsole() {
                 No individual registered donors found matching group {selectedReq?.requiredBloodGroup}.
               </div>
             ) : (
-              <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+              <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
                 {compatibleDonors.map((donor) => (
                   <div
                     key={donor.uid}

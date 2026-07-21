@@ -2,6 +2,12 @@ import type { WorkflowState } from '@/core/constants/workflowStates';
 
 export type UrgencyLevel = 'critical' | 'urgent' | 'normal';
 
+export interface CampAllocation {
+  campId:   string;
+  campName: string;
+  units:    number;
+}
+
 export interface DonationRequest {
   id:                 string;
   referenceNumber:    string;   // BB-YYYY-NNNNN
@@ -21,6 +27,7 @@ export interface DonationRequest {
   campName:           string | null;
   matchedDonorUid:    string | null;
   matchedDonorName:   string | null;
+  allocations?:       CampAllocation[] | null;
   donatedAt:          number | null;
   closureNotes:       string | null;
   createdAt:          number;

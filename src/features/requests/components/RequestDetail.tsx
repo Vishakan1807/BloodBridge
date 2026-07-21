@@ -206,8 +206,22 @@ export function RequestDetail() {
             </div>
             {request.matchedDonorName && (
               <div className="flex justify-between pt-2 border-t border-surface-700">
-                <span className="text-muted">Matched Donor:</span>
-                <span className="font-semibold text-success">{request.matchedDonorName}</span>
+                <span className="text-muted">Matched Donor / Source:</span>
+                <span className="font-semibold text-success text-right">{request.matchedDonorName}</span>
+              </div>
+            )}
+
+            {request.allocations && request.allocations.length > 0 && (
+              <div className="pt-2 border-t border-surface-700 space-y-1.5">
+                <span className="text-xs text-muted font-semibold uppercase tracking-wider block">
+                  Multi-Camp Split Allocations:
+                </span>
+                {request.allocations.map((alloc) => (
+                  <div key={alloc.campId} className="flex justify-between text-xs bg-surface-700/50 p-2 rounded-lg border border-surface-600/50">
+                    <span className="text-slate-200">🏢 {alloc.campName}:</span>
+                    <span className="font-bold text-brand-400">{alloc.units} unit(s)</span>
+                  </div>
+                ))}
               </div>
             )}
           </div>

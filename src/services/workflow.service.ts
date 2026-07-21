@@ -13,6 +13,7 @@ export async function transitionWorkflowState(
     campId?:       string;
     campName?:     string;
     matchedDonor?: { uid: string; name: string };
+    allocations?:  { campId: string; campName: string; units: number }[];
     closureNotes?: string;
     note?:         string;
   },
@@ -48,26 +49,46 @@ export async function transitionWorkflowState(
 
   // ── WF-G04: Inventory Auto-Decrement on DONATED ─────────────
   if (fromState === 'matched' && toState === 'donated') {
-    const targetCampId = extraData?.campId || request.campId;
-    if (!targetCampId) throw new Error('Processing camp is required to record donation.');
+    const allocations = request.allocations || extraData?.allocations;
 
-    // Fetch live stock to auto-decrement
-    const invSnap = await get(ref(db, `inventory/${targetCampId}/${request.requiredBloodGroup}`));
-    const currentStock = invSnap.exists() ? invSnap.val().units || 0 : 0;
+    if (allocations && allocations.length > 0) {
+      // Multi-camp deduction
+      for (const alloc of allocations) {
+        const invSnap = await get(ref(db, `inventory/${alloc.campId}/${request.requiredBloodGroup}`));
+        const currentStock = invSnap.exists() ? invSnap.val().units || 0 : 0;
+        if (currentStock < alloc.units) {
+          throw new Error(
+            `Insufficient stock in ${alloc.campName}! Available: ${currentStock} u, Required: ${alloc.units} u.`,
+          );
+        }
+        await updateInventoryStock(
+          alloc.campId,
+          request.requiredBloodGroup,
+          currentStock - alloc.units,
+          actor.uid,
+        );
+      }
+    } else {
+      // Single camp deduction
+      const targetCampId = extraData?.campId || request.campId;
+      if (!targetCampId) throw new Error('Processing camp is required to record donation.');
 
-    if (currentStock < request.unitsRequired) {
-      throw new Error(
-        `Insufficient inventory stock in camp! Available: ${currentStock} units, Required: ${request.unitsRequired} units.`,
+      const invSnap = await get(ref(db, `inventory/${targetCampId}/${request.requiredBloodGroup}`));
+      const currentStock = invSnap.exists() ? invSnap.val().units || 0 : 0;
+
+      if (currentStock < request.unitsRequired) {
+        throw new Error(
+          `Insufficient inventory stock in camp! Available: ${currentStock} units, Required: ${request.unitsRequired} units.`,
+        );
+      }
+
+      await updateInventoryStock(
+        targetCampId,
+        request.requiredBloodGroup,
+        currentStock - request.unitsRequired,
+        actor.uid,
       );
     }
-
-    // Auto-decrement camp inventory
-    await updateInventoryStock(
-      targetCampId,
-      request.requiredBloodGroup,
-      currentStock - request.unitsRequired,
-      actor.uid,
-    );
 
     // Update Donor History index for Trainer Extension
     if (request.matchedDonorUid) {
@@ -76,8 +97,8 @@ export async function transitionWorkflowState(
         requestId,
         referenceNumber:    request.referenceNumber,
         requiredBloodGroup: request.requiredBloodGroup,
-        campId:             targetCampId,
-        campName:           extraData?.campName || request.campName || 'Camp',
+        campId:             request.campId || 'multi-camp',
+        campName:           extraData?.campName || request.campName || 'Multi-Camp Inventory',
         hospitalName:       request.hospitalName,
         status:             'donated',
         donatedAt:          Date.now(),
@@ -92,8 +113,9 @@ export async function transitionWorkflowState(
     updatedAt: now,
   };
 
-  if (extraData?.campId)   updates.campId = extraData.campId;
-  if (extraData?.campName) updates.campName = extraData.campName;
+  if (extraData?.campId)       updates.campId = extraData.campId;
+  if (extraData?.campName)     updates.campName = extraData.campName;
+  if (extraData?.allocations)  updates.allocations = extraData.allocations;
   if (extraData?.matchedDonor) {
     updates.matchedDonorUid = extraData.matchedDonor.uid;
     updates.matchedDonorName = extraData.matchedDonor.name;
