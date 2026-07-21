@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ShieldCheck, Target, Droplet, ArrowRight, AlertTriangle, PlusCircle, Edit } from 'lucide-react';
-import { ref, onValue } from 'firebase/database';
+import { ShieldCheck, Target, Droplet, ArrowRight, AlertTriangle, PlusCircle, Building2 } from 'lucide-react';
+import { ref, onValue, update } from 'firebase/database';
 import { db } from '@/core/config/firebase';
 import { useAuth } from '@/core/context/AuthContext';
 import { useToast } from '@/core/context/ToastContext';
@@ -38,21 +38,34 @@ export function CoordinatorDashboard() {
   const [stockUnits, setStockUnits] = useState(5);
   const [savingStock, setSavingStock] = useState(false);
 
-  // Load camps & resolve assigned camp
+  // Load camps & resolve assigned camp strictly per coordinator
   useEffect(() => {
     return subscribeCamps((loadedCamps) => {
       setCamps(loadedCamps);
 
-      // Scoping logic:
-      // If Coordinator (manager), strictly resolve their assigned camp
       if (isManager && userProfile) {
-        const assignedCamp = loadedCamps.find(
-          (c) => c.id === userProfile.campId || c.coordinatorUid === userProfile.uid,
-        );
+        // Robust matching for coordinator account
+        const cleanName = userProfile.displayName.toLowerCase().replace(/manager|coordinator|admin/g, '').trim();
+        
+        const assignedCamp = loadedCamps.find((c) => {
+          if (c.id === userProfile.campId) return true;
+          if (c.coordinatorUid === userProfile.uid) return true;
+          if (cleanName && c.name.toLowerCase().includes(cleanName)) return true;
+          if (cleanName && cleanName.includes(c.name.toLowerCase())) return true;
+          return false;
+        });
+
         if (assignedCamp) {
           setSelectedCampId(assignedCamp.id);
-        } else if (loadedCamps.length > 0) {
-          setSelectedCampId(loadedCamps[0].id);
+
+          // Permanently sync campId and coordinatorUid if unlinked
+          if (userProfile.campId !== assignedCamp.id || assignedCamp.coordinatorUid !== userProfile.uid) {
+            update(ref(db, `users/${userProfile.uid}`), { campId: assignedCamp.id }).catch(() => {});
+            update(ref(db, `master/camps/${assignedCamp.id}`), { coordinatorUid: userProfile.uid }).catch(() => {});
+          }
+        } else {
+          // If manager has no camp assigned, reset selection (do NOT show random camp)
+          setSelectedCampId('');
         }
       } else if (isAdmin && !selectedCampId && loadedCamps.length > 0) {
         setSelectedCampId(loadedCamps[0].id);
@@ -62,7 +75,10 @@ export function CoordinatorDashboard() {
 
   // Load inventory for selected camp
   useEffect(() => {
-    if (!selectedCampId) return;
+    if (!selectedCampId) {
+      setInventory({});
+      return;
+    }
     return subscribeCampInventory(selectedCampId, (inv) => {
       setInventory(inv);
     });
@@ -79,7 +95,6 @@ export function CoordinatorDashboard() {
       }
       const data = Object.values(snapshot.val()) as any[];
 
-      // Filter queues for this camp (or unassigned/registered)
       const reg = data.filter((r) => r.status === 'registered');
       const ver = data.filter(
         (r) => r.status === 'verified' && (!r.campId || r.campId === selectedCampId),
@@ -100,7 +115,7 @@ export function CoordinatorDashboard() {
   async function handleSaveStock(e: React.FormEvent) {
     e.preventDefault();
     if (!selectedCampId) {
-      showError('No camp selected.');
+      showError('No camp assigned to this account.');
       return;
     }
     if (stockUnits < 0) {
@@ -132,7 +147,7 @@ export function CoordinatorDashboard() {
 
   return (
     <div className="space-y-6 page-enter">
-      {/* Header & Camp Lock/Selector */}
+      {/* Header & Camp Scoping */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-surface-800 border border-surface-600/40 rounded-2xl p-6">
         <div>
           <h1 className="font-display font-bold text-2xl text-white">
@@ -143,11 +158,11 @@ export function CoordinatorDashboard() {
           </p>
         </div>
 
-        {/* Access Control Scoping: Admins get dropdown, Coordinators get static locked badge */}
+        {/* Access Control Scoping */}
         {isAdmin ? (
           camps.length > 0 && (
             <div className="flex items-center gap-2">
-              <span className="text-xs text-muted font-medium">Switch Camp View (Admin):</span>
+              <span className="text-xs text-muted font-medium">Select Camp View (Admin):</span>
               <select
                 value={selectedCampId}
                 onChange={(e) => setSelectedCampId(e.target.value)}
@@ -162,11 +177,11 @@ export function CoordinatorDashboard() {
             </div>
           )
         ) : (
-          /* Manager Role: Strictly locked to their assigned camp */
+          /* Manager Role: Strictly scoped to assigned camp */
           <div className="flex items-center gap-2 bg-surface-700/60 border border-surface-600 px-4 py-2 rounded-xl text-xs">
             <span className="text-muted">Assigned Camp:</span>
             <span className="font-bold text-brand-400 text-sm font-display">
-              {currentAssignedCamp ? `${currentAssignedCamp.name} (${currentAssignedCamp.city})` : 'Assigned Camp'}
+              {currentAssignedCamp ? `${currentAssignedCamp.name} (${currentAssignedCamp.city})` : 'Unassigned (Contact Admin)'}
             </span>
           </div>
         )}
@@ -225,15 +240,18 @@ export function CoordinatorDashboard() {
       <Card padding="lg">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5">
           <div>
-            <h2 className="font-display font-semibold text-lg text-white">Live Camp Inventory</h2>
+            <h2 className="font-display font-semibold text-lg text-white">
+              Live Inventory — {currentAssignedCamp?.name || 'Camp Inventory'}
+            </h2>
             <p className="text-xs text-muted">
-              Stock levels for <strong className="text-slate-200">{currentAssignedCamp?.name || 'Camp'}</strong>. Decrements on donation; increment via Inward Stock.
+              Stock availability for <strong className="text-slate-200">{currentAssignedCamp?.name || 'Unassigned Camp'}</strong> ({currentAssignedCamp?.city || 'City'}).
             </p>
           </div>
 
           <Button
             variant="primary"
             size="sm"
+            disabled={!selectedCampId}
             icon={<PlusCircle size={16} />}
             onClick={() => setStockModalOpen(true)}
           >
@@ -241,15 +259,25 @@ export function CoordinatorDashboard() {
           </Button>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-          {BLOOD_GROUPS.map((bg) => (
-            <InventoryGauge
-              key={bg}
-              bloodGroup={bg}
-              units={inventory[bg]?.units || 0}
-            />
-          ))}
-        </div>
+        {!selectedCampId ? (
+          <div className="text-center py-12 bg-surface-700/30 rounded-xl border border-surface-600/40">
+            <Building2 size={36} className="text-muted mx-auto mb-2 opacity-60" />
+            <p className="text-slate-200 font-medium text-sm">No Camp Assigned to {userProfile?.displayName}</p>
+            <p className="text-xs text-muted mt-1 max-w-md mx-auto">
+              Ask a System Admin to assign your account to your blood bank/camp in <strong>Master Data &gt; Camps</strong>.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+            {BLOOD_GROUPS.map((bg) => (
+              <InventoryGauge
+                key={bg}
+                bloodGroup={bg}
+                units={inventory[bg]?.units || 0}
+              />
+            ))}
+          </div>
+        )}
       </Card>
 
       {/* Stock Inward / Adjustment Modal */}
@@ -269,7 +297,6 @@ export function CoordinatorDashboard() {
             value={stockBloodGroup}
             onChange={(e) => {
               setStockBloodGroup(e.target.value);
-              // Auto fill current stock
               setStockUnits(inventory[e.target.value]?.units || 0);
             }}
             required

@@ -88,9 +88,17 @@ export function CampsPage() {
           phone: phone.trim(),
           coordinatorUid: coordinatorUid || null,
         });
+
+        // Link user profile campId
+        if (coordinatorUid) {
+          const { ref: fRef, update: fUpdate } = await import('firebase/database');
+          const { db: fDb } = await import('@/core/config/firebase');
+          await fUpdate(fRef(fDb, `users/${coordinatorUid}`), { campId: editingCamp.id });
+        }
+
         showSuccess(`Camp ${name} updated.`);
       } else {
-        await createCamp({
+        const newCampId = await createCamp({
           name: name.trim(),
           address: address.trim(),
           city: city.trim(),
@@ -99,6 +107,14 @@ export function CampsPage() {
           isActive: true,
           createdBy: userProfile?.uid ?? '',
         });
+
+        // Link user profile campId
+        if (coordinatorUid && newCampId) {
+          const { ref: fRef, update: fUpdate } = await import('firebase/database');
+          const { db: fDb } = await import('@/core/config/firebase');
+          await fUpdate(fRef(fDb, `users/${coordinatorUid}`), { campId: newCampId });
+        }
+
         showSuccess(`Camp ${name} created.`);
       }
       setModalOpen(false);
