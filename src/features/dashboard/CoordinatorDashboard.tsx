@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ShieldCheck, Target, Droplet, ArrowRight, AlertTriangle, PlusCircle, Building2 } from 'lucide-react';
-import { ref, onValue, update } from 'firebase/database';
+import { ref, onValue, update, push, set } from 'firebase/database';
 import { db } from '@/core/config/firebase';
 import { useAuth } from '@/core/context/AuthContext';
 import { useToast } from '@/core/context/ToastContext';
@@ -38,16 +38,15 @@ export function CoordinatorDashboard() {
   const [stockUnits, setStockUnits] = useState(5);
   const [savingStock, setSavingStock] = useState(false);
 
-  // Load camps & resolve assigned camp strictly per coordinator
+  // Load camps & auto-provision manager's own dedicated blood bank if needed
   useEffect(() => {
-    return subscribeCamps((loadedCamps) => {
+    return subscribeCamps(async (loadedCamps) => {
       setCamps(loadedCamps);
 
       if (isManager && userProfile) {
-        // Robust matching for coordinator account
         const cleanName = userProfile.displayName.toLowerCase().replace(/manager|coordinator|admin/g, '').trim();
         
-        const assignedCamp = loadedCamps.find((c) => {
+        let assignedCamp = loadedCamps.find((c) => {
           if (c.id === userProfile.campId) return true;
           if (c.coordinatorUid === userProfile.uid) return true;
           if (cleanName && c.name.toLowerCase().includes(cleanName)) return true;
@@ -55,7 +54,37 @@ export function CoordinatorDashboard() {
           return false;
         });
 
-        if (assignedCamp) {
+        // Auto-provision dedicated Camp for Manager if none exists!
+        if (!assignedCamp) {
+          try {
+            const campRef = push(ref(db, 'master/camps'));
+            const newCampId = campRef.key || `camp-${Date.now()}`;
+            const campName = userProfile.displayName.includes('Camp') || userProfile.displayName.includes('Bank')
+              ? userProfile.displayName
+              : `${userProfile.displayName} Blood Bank`;
+
+            const newCamp = {
+              id:             newCampId,
+              name:           campName,
+              address:        userProfile.city ? `${userProfile.city} Central Center` : 'Central Blood Bank',
+              city:           userProfile.city || 'Chennai',
+              phone:          userProfile.phone || '+91-9876543210',
+              coordinatorUid: userProfile.uid,
+              isActive:       true,
+              createdBy:      userProfile.uid,
+              createdAt:      Date.now(),
+              updatedAt:      Date.now(),
+            };
+
+            await set(campRef, newCamp);
+            await update(ref(db, `users/${userProfile.uid}`), { campId: newCampId });
+
+            setSelectedCampId(newCampId);
+            return;
+          } catch (e) {
+            console.error('Failed to auto-provision manager camp:', e);
+          }
+        } else {
           setSelectedCampId(assignedCamp.id);
 
           // Permanently sync campId and coordinatorUid if unlinked
@@ -63,9 +92,6 @@ export function CoordinatorDashboard() {
             update(ref(db, `users/${userProfile.uid}`), { campId: assignedCamp.id }).catch(() => {});
             update(ref(db, `master/camps/${assignedCamp.id}`), { coordinatorUid: userProfile.uid }).catch(() => {});
           }
-        } else {
-          // If manager has no camp assigned, reset selection (do NOT show random camp)
-          setSelectedCampId('');
         }
       } else if (isAdmin && !selectedCampId && loadedCamps.length > 0) {
         setSelectedCampId(loadedCamps[0].id);
@@ -179,9 +205,9 @@ export function CoordinatorDashboard() {
         ) : (
           /* Manager Role: Strictly scoped to assigned camp */
           <div className="flex items-center gap-2 bg-surface-700/60 border border-surface-600 px-4 py-2 rounded-xl text-xs">
-            <span className="text-muted">Assigned Camp:</span>
+            <span className="text-muted">Assigned Blood Bank:</span>
             <span className="font-bold text-brand-400 text-sm font-display">
-              {currentAssignedCamp ? `${currentAssignedCamp.name} (${currentAssignedCamp.city})` : 'Unassigned (Contact Admin)'}
+              {currentAssignedCamp ? `${currentAssignedCamp.name} (${currentAssignedCamp.city})` : `${userProfile?.displayName || 'Blood Bank'} (Initializing...)`}
             </span>
           </div>
         )}
@@ -241,10 +267,10 @@ export function CoordinatorDashboard() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5">
           <div>
             <h2 className="font-display font-semibold text-lg text-white">
-              Live Inventory — {currentAssignedCamp?.name || 'Camp Inventory'}
+              Live Inventory — {currentAssignedCamp?.name || userProfile?.displayName || 'Blood Bank'}
             </h2>
             <p className="text-xs text-muted">
-              Stock availability for <strong className="text-slate-200">{currentAssignedCamp?.name || 'Unassigned Camp'}</strong> ({currentAssignedCamp?.city || 'City'}).
+              Stock availability for <strong className="text-slate-200">{currentAssignedCamp?.name || userProfile?.displayName || 'Blood Bank'}</strong> ({currentAssignedCamp?.city || userProfile?.city || 'Location'}).
             </p>
           </div>
 
@@ -259,36 +285,26 @@ export function CoordinatorDashboard() {
           </Button>
         </div>
 
-        {!selectedCampId ? (
-          <div className="text-center py-12 bg-surface-700/30 rounded-xl border border-surface-600/40">
-            <Building2 size={36} className="text-muted mx-auto mb-2 opacity-60" />
-            <p className="text-slate-200 font-medium text-sm">No Camp Assigned to {userProfile?.displayName}</p>
-            <p className="text-xs text-muted mt-1 max-w-md mx-auto">
-              Ask a System Admin to assign your account to your blood bank/camp in <strong>Master Data &gt; Camps</strong>.
-            </p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-            {BLOOD_GROUPS.map((bg) => (
-              <InventoryGauge
-                key={bg}
-                bloodGroup={bg}
-                units={inventory[bg]?.units || 0}
-              />
-            ))}
-          </div>
-        )}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+          {BLOOD_GROUPS.map((bg) => (
+            <InventoryGauge
+              key={bg}
+              bloodGroup={bg}
+              units={inventory[bg]?.units || 0}
+            />
+          ))}
+        </div>
       </Card>
 
       {/* Stock Inward / Adjustment Modal */}
       <Modal
         isOpen={stockModalOpen}
         onClose={() => setStockModalOpen(false)}
-        title={`Inward Stock & Inventory Adjustment — ${currentAssignedCamp?.name || 'Camp'}`}
+        title={`Inward Stock & Inventory Adjustment — ${currentAssignedCamp?.name || 'Blood Bank'}`}
       >
         <form onSubmit={handleSaveStock} className="space-y-4">
           <p className="text-xs text-muted">
-            Record newly collected blood units from donation drives or adjust live stock for {currentAssignedCamp?.name}.
+            Record newly collected blood units from donation drives or adjust live stock for {currentAssignedCamp?.name || 'your Blood Bank'}.
           </p>
 
           <Select
