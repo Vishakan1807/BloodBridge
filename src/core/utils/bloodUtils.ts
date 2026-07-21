@@ -31,3 +31,27 @@ export const CLINICAL_BLOOD_GROUPS: BloodGroupConfig[] = [
   // Non-Individual / Organizational Account Option
   { value: 'N/A - Camp', label: 'N/A — Blood Camp / Organization', category: 'standard', description: 'For Camp Coordinator & Organizational accounts' },
 ];
+
+export function isBloodCompatible(donorGroup: string, recipientGroup: string): boolean {
+  if (!donorGroup || !recipientGroup) return false;
+  if (donorGroup.startsWith('N/A')) return false;
+  if (donorGroup === recipientGroup) return true;
+  if (donorGroup === 'O-') return true;
+  if (donorGroup === 'Rh-null') return true;
+
+  if (recipientGroup === 'A1-') return ['A1-', 'A-', 'O-'].includes(donorGroup);
+  if (recipientGroup === 'A1+') return ['A1+', 'A1-', 'A+', 'A-', 'O+', 'O-'].includes(donorGroup);
+  if (recipientGroup === 'A2-') return ['A2-', 'A-', 'O-'].includes(donorGroup);
+  if (recipientGroup === 'A2+') return ['A2+', 'A2-', 'A+', 'A-', 'O+', 'O-'].includes(donorGroup);
+  if (recipientGroup === 'A1B-') return ['A1B-', 'AB-', 'A-', 'B-', 'O-'].includes(donorGroup);
+  if (recipientGroup === 'A1B+') return !donorGroup.startsWith('N/A');
+
+  if (recipientGroup === 'A-') return ['A-', 'O-'].includes(donorGroup);
+  if (recipientGroup === 'A+') return ['A+', 'A-', 'O+', 'O-'].includes(donorGroup);
+  if (recipientGroup === 'B-') return ['B-', 'O-'].includes(donorGroup);
+  if (recipientGroup === 'B+') return ['B+', 'B-', 'O+', 'O-'].includes(donorGroup);
+  if (recipientGroup === 'AB-') return ['AB-', 'A-', 'B-', 'O-'].includes(donorGroup);
+  if (recipientGroup === 'AB+') return !donorGroup.startsWith('N/A');
+
+  return false;
+}
