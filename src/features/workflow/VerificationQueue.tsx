@@ -4,6 +4,7 @@ import { useAuth } from '@/core/context/AuthContext';
 import { useToast } from '@/core/context/ToastContext';
 import { useRequests } from '@/features/requests/hooks/useRequests';
 import { subscribeCamps } from '@/services/master.service';
+import { listUsers } from '@/services/user.service';
 import { transitionWorkflowState } from '@/services/workflow.service';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -24,21 +25,76 @@ export function VerificationQueue() {
   const [verifying, setVerifying] = useState(false);
 
   useEffect(() => {
-    return subscribeCamps((list) => {
-      const active = list.filter((c) => c.isActive);
+    // Load all camps and ensure any Manager account has their blood bank included
+    const unsub = subscribeCamps(async (list) => {
+      let active = list.filter((c) => c.isActive);
+
+      // Check if any manager user exists whose camp is not in active list
+      try {
+        const allUsers = await listUsers();
+        const managerUsers = allUsers.filter((u) => u.role === 'manager');
+
+        for (const mgr of managerUsers) {
+          const cleanMgrName = mgr.displayName.toLowerCase().replace(/manager|coordinator|admin/g, '').trim();
+          const hasCamp = active.some(
+            (c) =>
+              c.id === mgr.campId ||
+              c.coordinatorUid === mgr.uid ||
+              (cleanMgrName && c.name.toLowerCase().includes(cleanMgrName)),
+          );
+
+          if (!hasCamp) {
+            const virtualCampName = mgr.displayName.includes('Camp') || mgr.displayName.includes('Bank')
+              ? mgr.displayName
+              : `${mgr.displayName} Blood Bank`;
+
+            active.push({
+              id:             mgr.campId || `virtual-${mgr.uid}`,
+              name:           virtualCampName,
+              address:        mgr.city ? `${mgr.city} Center` : 'Central Hub',
+              city:           mgr.city || 'Chennai',
+              phone:          mgr.phone || '',
+              coordinatorUid: mgr.uid,
+              isActive:       true,
+              createdBy:      mgr.uid,
+              createdAt:      Date.now(),
+            });
+          }
+        }
+      } catch (e) {
+        // Fall back to active camps if user fetch fails
+      }
+
       setCamps(active);
-      if (active.length > 0 && !selectedCampId) {
+
+      // Auto-select logged-in coordinator's camp if manager
+      if (userProfile?.role === 'manager' && userProfile) {
+        const mgrCamp = active.find(
+          (c) => c.id === userProfile.campId || c.coordinatorUid === userProfile.uid,
+        );
+        if (mgrCamp) setSelectedCampId(mgrCamp.id);
+        else if (active.length > 0) setSelectedCampId(active[0].id);
+      } else if (active.length > 0 && !selectedCampId) {
         setSelectedCampId(active[0].id);
       }
     });
-  }, []);
+
+    return unsub;
+  }, [userProfile]);
 
   const pendingRequests = requests.filter((r) => r.status === 'registered');
 
   function handleOpenVerify(req: DonationRequest) {
     setSelectedReq(req);
-    if (camps.length > 0) setSelectedCampId(camps[0].id);
-    // Modal will render if selectedReq is not null
+    if (userProfile?.role === 'manager') {
+      const mgrCamp = camps.find(
+        (c) => c.id === userProfile.campId || c.coordinatorUid === userProfile.uid,
+      );
+      if (mgrCamp) setSelectedCampId(mgrCamp.id);
+      else if (camps.length > 0) setSelectedCampId(camps[0].id);
+    } else if (camps.length > 0) {
+      setSelectedCampId(camps[0].id);
+    }
   }
 
   async function handleConfirmVerify() {
@@ -50,9 +106,9 @@ export function VerificationQueue() {
       await transitionWorkflowState(selectedReq.id, 'verified', userProfile, {
         campId:   selectedCampId,
         campName: targetCamp?.name || 'Camp',
-        note:     `Verified donor details and assigned to camp ${targetCamp?.name}`,
+        note:     `Verified donor details and assigned to processing camp ${targetCamp?.name}`,
       });
-      showSuccess(`Request ${selectedReq.referenceNumber} verified successfully!`);
+      showSuccess(`Request ${selectedReq.referenceNumber} verified successfully and assigned to ${targetCamp?.name}!`);
       setSelectedReq(null);
     } catch (err: any) {
       showError(err?.message || 'Verification failed.');
