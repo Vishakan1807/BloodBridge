@@ -2,6 +2,7 @@ import React from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import { Menu } from 'lucide-react';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
+import { NotificationCenter } from '@/components/layout/NotificationCenter';
 
 interface HeaderProps {
   onMenuClick: () => void;
@@ -88,8 +89,11 @@ export function Header({ onMenuClick }: HeaderProps) {
         </nav>
       </div>
 
-      {/* Global Theme Toggle */}
-      <ThemeToggle />
+      {/* Right Controls: Notifications & Theme Toggle */}
+      <div className="flex items-center gap-3">
+        <NotificationCenter />
+        <ThemeToggle />
+      </div>
     </header>
   );
 }

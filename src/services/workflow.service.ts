@@ -132,4 +132,64 @@ export async function transitionWorkflowState(
     metadata:      { referenceNumber: request.referenceNumber },
     timestamp:     now,
   });
+
+  // ── Dispatch Automated Email & SMS Notifications ───────────
+  try {
+    const { sendNotification } = await import('@/services/notification.service');
+    const { getProfile } = await import('@/services/user.service');
+
+    // 1. Notify Requester
+    if (request.createdBy) {
+      const requester = await getProfile(request.createdBy);
+      if (requester) {
+        let title = `Request ${request.referenceNumber} Status Updated`;
+        let message = `Your request for ${request.patientName} (${request.requiredBloodGroup}) transitioned from ${fromState.toUpperCase()} to ${toState.toUpperCase()}.`;
+
+        if (toState === 'matched') {
+          const matchedLocation = extraData?.campName || updates.matchedDonorName || 'Assigned Blood Camp';
+          title = `🩸 [BloodBridge Alert] Donor/Stock Matched for ${request.referenceNumber}!`;
+          message = `Great news! Your blood request ${request.referenceNumber} for ${request.patientName} (${request.requiredBloodGroup}) is MATCHED at ${matchedLocation}. Please collect the blood units for transfusion at ${request.hospitalName}.`;
+        } else if (toState === 'donated') {
+          title = `💉 [BloodBridge Alert] Donation Recorded for ${request.referenceNumber}`;
+          message = `Blood units for ${request.patientName} have been recorded as donated/dispatched from ${request.campName || 'Camp'}.`;
+        } else if (toState === 'closed') {
+          title = `🔒 [BloodBridge Alert] Case Closed — ${request.referenceNumber}`;
+          message = `Request ${request.referenceNumber} has been successfully closed. Notes: "${extraData?.closureNotes || 'Case completed.'}"`;
+        }
+
+        await sendNotification({
+          recipientUid:   requester.uid,
+          recipientEmail: requester.email,
+          recipientPhone: requester.phone,
+          recipientName:  requester.displayName,
+          title,
+          message,
+          channel:        'both',
+          requestId,
+          refNumber:      request.referenceNumber,
+        });
+      }
+    }
+
+    // 2. If Matched Individual Donor exists, notify matched donor as well
+    if (toState === 'matched' && extraData?.matchedDonor?.uid && !extraData.matchedDonor.uid.startsWith('inventory-')) {
+      const matchedDonorProfile = await getProfile(extraData.matchedDonor.uid);
+      if (matchedDonorProfile) {
+        await sendNotification({
+          recipientUid:   matchedDonorProfile.uid,
+          recipientEmail: matchedDonorProfile.email,
+          recipientPhone: matchedDonorProfile.phone,
+          recipientName:  matchedDonorProfile.displayName,
+          title:          `🩸 Urgent Match Confirmation — ${request.referenceNumber}`,
+          message:        `You have been matched as a donor for request ${request.referenceNumber} (${request.patientName}, ${request.requiredBloodGroup}) at ${request.hospitalName}. Please report to ${extraData.campName || 'the assigned blood camp'}.`,
+          channel:        'both',
+          requestId,
+          refNumber:      request.referenceNumber,
+        });
+      }
+    }
+  } catch (notifErr) {
+    // Log error without breaking workflow state transition
+    console.error('Failed to dispatch notification:', notifErr);
+  }
 }
