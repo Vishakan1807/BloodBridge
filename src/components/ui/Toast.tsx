@@ -10,22 +10,22 @@ const VARIANT_CONFIG: Record<ToastVariant, {
   success: {
     icon:   <CheckCircle size={18} className="text-success shrink-0" />,
     border: 'border-l-success',
-    bg:     'bg-surface-800',
+    bg:     'bg-surface-800 border-surface-600',
   },
   error: {
     icon:   <XCircle size={18} className="text-danger shrink-0" />,
     border: 'border-l-danger',
-    bg:     'bg-surface-800',
+    bg:     'bg-surface-800 border-surface-600',
   },
   warning: {
     icon:   <AlertTriangle size={18} className="text-warning shrink-0" />,
     border: 'border-l-warning',
-    bg:     'bg-surface-800',
+    bg:     'bg-surface-800 border-surface-600',
   },
   info: {
     icon:   <Info size={18} className="text-info shrink-0" />,
     border: 'border-l-info',
-    bg:     'bg-surface-800',
+    bg:     'bg-surface-800 border-surface-600',
   },
 };
 
@@ -37,28 +37,28 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: (id: string)
       role="alert"
       aria-live="polite"
       className={[
-        'flex items-start gap-3 p-4 rounded-lg border border-surface-600/50 border-l-4',
-        'shadow-modal min-w-72 max-w-sm',
-        'animate-[toastIn_0.2s_ease-out]',
+        'flex items-start gap-3 p-4 rounded-xl border border-l-4',
+        'shadow-2xl min-w-72 max-w-md w-full',
+        'animate-[toastUp_0.25s_ease-out]',
         config.border,
         config.bg,
       ].join(' ')}
-      style={{ animation: 'toastIn 0.2s ease-out' }}
+      style={{ animation: 'toastUp 0.25s ease-out' }}
     >
       {config.icon}
-      <p className="text-sm text-slate-200 flex-1 leading-snug">{toast.message}</p>
+      <p className="text-sm font-medium text-slate-100 flex-1 leading-snug">{toast.message}</p>
       <button
         onClick={() => onDismiss(toast.id)}
-        className="text-muted hover:text-slate-300 transition-colors shrink-0 mt-0.5"
+        className="text-muted hover:text-slate-300 transition-colors shrink-0 mt-0.5 cursor-pointer p-0.5 rounded-md hover:bg-surface-700"
         aria-label="Dismiss notification"
       >
         <X size={14} />
       </button>
 
       <style>{`
-        @keyframes toastIn {
-          from { opacity: 0; transform: translateX(100%); }
-          to   { opacity: 1; transform: translateX(0); }
+        @keyframes toastUp {
+          from { opacity: 0; transform: translateY(20px); }
+          to   { opacity: 1; transform: translateY(0); }
         }
       `}</style>
     </div>
@@ -72,11 +72,13 @@ export function ToastContainer() {
 
   return (
     <div
-      className="fixed top-5 right-5 z-[9999] flex flex-col gap-3"
+      className="fixed bottom-6 right-6 z-[9999] flex flex-col-reverse gap-3 max-w-md w-full pointer-events-none"
       aria-label="Notifications"
     >
       {toasts.map((t) => (
-        <ToastItem key={t.id} toast={t} onDismiss={dismiss} />
+        <div key={t.id} className="pointer-events-auto">
+          <ToastItem toast={t} onDismiss={dismiss} />
+        </div>
       ))}
     </div>
   );
