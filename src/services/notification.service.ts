@@ -47,7 +47,10 @@ async function dispatchRealEmail(data: {
         template_params: {
           to_email:   data.toEmail,
           to_name:    data.toName,
+          email:      data.toEmail,
+          name:       data.toName,
           subject:    data.title,
+          title:      data.title,
           message:    data.message,
           ref_number: data.refNumber || '',
         },
