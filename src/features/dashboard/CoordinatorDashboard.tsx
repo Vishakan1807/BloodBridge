@@ -1,38 +1,64 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ShieldCheck, Target, Droplet, ArrowRight, AlertTriangle } from 'lucide-react';
+import { ShieldCheck, Target, Droplet, ArrowRight, AlertTriangle, PlusCircle, Edit } from 'lucide-react';
 import { ref, onValue } from 'firebase/database';
 import { db } from '@/core/config/firebase';
 import { useAuth } from '@/core/context/AuthContext';
+import { useToast } from '@/core/context/ToastContext';
 import { KPICard } from '@/components/ui/KPICard';
 import { InventoryGauge } from '@/components/ui/InventoryGauge';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
+import { Select, type SelectOption } from '@/components/ui/Select';
+import { Modal } from '@/components/ui/Modal';
 import { ROUTES } from '@/core/constants/routes';
-import { subscribeCampInventory, subscribeCamps } from '@/services/master.service';
+import { subscribeCampInventory, subscribeCamps, updateInventoryStock } from '@/services/master.service';
 import type { CampInventory, Camp } from '@/types/master.types';
-
 import { CLINICAL_BLOOD_GROUPS } from '@/core/utils/bloodUtils';
 
 const BLOOD_GROUPS = CLINICAL_BLOOD_GROUPS.map((g) => g.value);
 
 export function CoordinatorDashboard() {
   const { userProfile } = useAuth();
+  const { showSuccess, showError } = useToast();
+
+  const isAdmin = userProfile?.role === 'admin';
+  const isManager = userProfile?.role === 'manager';
+
   const [camps, setCamps] = useState<Camp[]>([]);
-  const [selectedCampId, setSelectedCampId] = useState<string>(userProfile?.campId ?? '');
+  const [selectedCampId, setSelectedCampId] = useState<string>('');
   const [inventory, setInventory] = useState<CampInventory>({});
   const [pendingVerifications, setPendingVerifications] = useState(0);
   const [pendingMatches, setPendingMatches] = useState(0);
 
-  // Load camps
+  // Stock Inward / Adjust Modal State
+  const [stockModalOpen, setStockModalOpen] = useState(false);
+  const [stockBloodGroup, setStockBloodGroup] = useState('O+');
+  const [stockUnits, setStockUnits] = useState(5);
+  const [savingStock, setSavingStock] = useState(false);
+
+  // Load camps & resolve assigned camp
   useEffect(() => {
     return subscribeCamps((loadedCamps) => {
       setCamps(loadedCamps);
-      if (!selectedCampId && loadedCamps.length > 0) {
+
+      // Scoping logic:
+      // If Coordinator (manager), strictly resolve their assigned camp
+      if (isManager && userProfile) {
+        const assignedCamp = loadedCamps.find(
+          (c) => c.id === userProfile.campId || c.coordinatorUid === userProfile.uid,
+        );
+        if (assignedCamp) {
+          setSelectedCampId(assignedCamp.id);
+        } else if (loadedCamps.length > 0) {
+          setSelectedCampId(loadedCamps[0].id);
+        }
+      } else if (isAdmin && !selectedCampId && loadedCamps.length > 0) {
         setSelectedCampId(loadedCamps[0].id);
       }
     });
-  }, []);
+  }, [userProfile, isManager, isAdmin]);
 
   // Load inventory for selected camp
   useEffect(() => {
@@ -42,7 +68,7 @@ export function CoordinatorDashboard() {
     });
   }, [selectedCampId]);
 
-  // Load request queues
+  // Load request queues for selected camp
   useEffect(() => {
     const requestsRef = ref(db, 'requests');
     return onValue(requestsRef, (snapshot) => {
@@ -52,17 +78,61 @@ export function CoordinatorDashboard() {
         return;
       }
       const data = Object.values(snapshot.val()) as any[];
-      setPendingVerifications(data.filter((r) => r.status === 'registered').length);
-      setPendingMatches(data.filter((r) => r.status === 'verified').length);
-    });
-  }, []);
 
+      // Filter queues for this camp (or unassigned/registered)
+      const reg = data.filter((r) => r.status === 'registered');
+      const ver = data.filter(
+        (r) => r.status === 'verified' && (!r.campId || r.campId === selectedCampId),
+      );
+
+      setPendingVerifications(reg.length);
+      setPendingMatches(ver.length);
+    });
+  }, [selectedCampId]);
+
+  // Stock calculations
   const totalUnits = Object.values(inventory).reduce((sum, item) => sum + (item.units || 0), 0);
   const lowStockCount = BLOOD_GROUPS.filter((bg) => (inventory[bg]?.units || 0) <= 3).length;
 
+  const currentAssignedCamp = camps.find((c) => c.id === selectedCampId);
+
+  // Stock Inward / Adjustment Handler
+  async function handleSaveStock(e: React.FormEvent) {
+    e.preventDefault();
+    if (!selectedCampId) {
+      showError('No camp selected.');
+      return;
+    }
+    if (stockUnits < 0) {
+      showError('Units cannot be negative.');
+      return;
+    }
+
+    setSavingStock(true);
+    try {
+      await updateInventoryStock(
+        selectedCampId,
+        stockBloodGroup,
+        Number(stockUnits),
+        userProfile?.uid ?? 'system',
+      );
+      showSuccess(`Updated ${stockBloodGroup} stock to ${stockUnits} units for ${currentAssignedCamp?.name || 'Camp'}.`);
+      setStockModalOpen(false);
+    } catch (err: any) {
+      showError(err?.message || 'Failed to update stock.');
+    } finally {
+      setSavingStock(false);
+    }
+  }
+
+  const bloodGroupSelectOptions: SelectOption[] = CLINICAL_BLOOD_GROUPS.map((bg) => ({
+    value: bg.value,
+    label: `${bg.label}${bg.category !== 'standard' ? ' 🌟' : ''}`,
+  }));
+
   return (
     <div className="space-y-6 page-enter">
-      {/* Header & Camp Selector */}
+      {/* Header & Camp Lock/Selector */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-surface-800 border border-surface-600/40 rounded-2xl p-6">
         <div>
           <h1 className="font-display font-bold text-2xl text-white">
@@ -73,20 +143,31 @@ export function CoordinatorDashboard() {
           </p>
         </div>
 
-        {camps.length > 0 && (
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-muted font-medium">Select Camp:</span>
-            <select
-              value={selectedCampId}
-              onChange={(e) => setSelectedCampId(e.target.value)}
-              className="bg-surface-700 border border-surface-600 text-slate-100 text-sm rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
-            >
-              {camps.map((camp) => (
-                <option key={camp.id} value={camp.id}>
-                  {camp.name} ({camp.city})
-                </option>
-              ))}
-            </select>
+        {/* Access Control Scoping: Admins get dropdown, Coordinators get static locked badge */}
+        {isAdmin ? (
+          camps.length > 0 && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted font-medium">Switch Camp View (Admin):</span>
+              <select
+                value={selectedCampId}
+                onChange={(e) => setSelectedCampId(e.target.value)}
+                className="bg-surface-700 border border-surface-600 text-slate-100 text-sm rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+              >
+                {camps.map((camp) => (
+                  <option key={camp.id} value={camp.id}>
+                    {camp.name} ({camp.city})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )
+        ) : (
+          /* Manager Role: Strictly locked to their assigned camp */
+          <div className="flex items-center gap-2 bg-surface-700/60 border border-surface-600 px-4 py-2 rounded-xl text-xs">
+            <span className="text-muted">Assigned Camp:</span>
+            <span className="font-bold text-brand-400 text-sm font-display">
+              {currentAssignedCamp ? `${currentAssignedCamp.name} (${currentAssignedCamp.city})` : 'Assigned Camp'}
+            </span>
           </div>
         )}
       </div>
@@ -142,11 +223,22 @@ export function CoordinatorDashboard() {
 
       {/* Live Inventory Gauges Grid */}
       <Card padding="lg">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5">
           <div>
             <h2 className="font-display font-semibold text-lg text-white">Live Camp Inventory</h2>
-            <p className="text-xs text-muted">Stock availability per blood group</p>
+            <p className="text-xs text-muted">
+              Stock levels for <strong className="text-slate-200">{currentAssignedCamp?.name || 'Camp'}</strong>. Decrements on donation; increment via Inward Stock.
+            </p>
           </div>
+
+          <Button
+            variant="primary"
+            size="sm"
+            icon={<PlusCircle size={16} />}
+            onClick={() => setStockModalOpen(true)}
+          >
+            Inward Stock / Adjust Units
+          </Button>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
@@ -159,6 +251,51 @@ export function CoordinatorDashboard() {
           ))}
         </div>
       </Card>
+
+      {/* Stock Inward / Adjustment Modal */}
+      <Modal
+        isOpen={stockModalOpen}
+        onClose={() => setStockModalOpen(false)}
+        title={`Inward Stock & Inventory Adjustment — ${currentAssignedCamp?.name || 'Camp'}`}
+      >
+        <form onSubmit={handleSaveStock} className="space-y-4">
+          <p className="text-xs text-muted">
+            Record newly collected blood units from donation drives or adjust live stock for {currentAssignedCamp?.name}.
+          </p>
+
+          <Select
+            label="Select Blood Group"
+            options={bloodGroupSelectOptions}
+            value={stockBloodGroup}
+            onChange={(e) => {
+              setStockBloodGroup(e.target.value);
+              // Auto fill current stock
+              setStockUnits(inventory[e.target.value]?.units || 0);
+            }}
+            required
+          />
+
+          <Input
+            label="Total Available Units in Stock"
+            type="number"
+            min={0}
+            max={500}
+            value={stockUnits}
+            onChange={(e) => setStockUnits(Number(e.target.value))}
+            hint={`Current stock for ${stockBloodGroup}: ${inventory[stockBloodGroup]?.units || 0} units`}
+            required
+          />
+
+          <div className="flex justify-end gap-3 pt-4 border-t border-surface-700">
+            <Button variant="ghost" type="button" onClick={() => setStockModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="primary" type="submit" loading={savingStock}>
+              Update Stock
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }

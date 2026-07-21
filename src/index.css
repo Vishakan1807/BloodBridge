@@ -100,7 +100,27 @@ body {
   flex-direction: column;
 }
 
-/* ── Global Theme Overrides for Light Mode Compatibility ────── */
+/* ── Global Theme Overrides & Dropdown Options Fix ───────────── */
+option {
+  background-color: var(--color-surface-800);
+  color: var(--color-text-main);
+}
+
+[data-theme="dark"] option {
+  background-color: #1a1015 !important;
+  color: #f8fafc !important;
+}
+
+[data-theme="emerald"] option {
+  background-color: #0c272d !important;
+  color: #f0fdf4 !important;
+}
+
+[data-theme="light"] option {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+}
+
 [data-theme="light"] input,
 [data-theme="light"] select,
 [data-theme="light"] textarea {
