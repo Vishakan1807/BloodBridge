@@ -14,12 +14,13 @@ import { CLINICAL_BLOOD_GROUPS } from '@/core/utils/bloodUtils';
 
 function parseFirebaseError(code: string): string {
   const map: Record<string, string> = {
-    'auth/email-already-in-use':   'This email is already registered. Please sign in.',
-    'auth/invalid-email':          'Enter a valid email address.',
-    'auth/network-request-failed': 'Network error. Check your connection.',
-    'auth/too-many-requests':      'Too many attempts. Try again later.',
+    'auth/email-already-in-use':   'This email ID already exists in our system. Please sign in to your existing account.',
+    'auth/invalid-email':          'Please enter a valid email address.',
+    'auth/weak-password':          'Password is too weak. Please use at least 8 characters.',
+    'auth/network-request-failed': 'Network connection error. Please check your internet connection.',
+    'auth/too-many-requests':      'Too many registration attempts. Please try again later.',
   };
-  return map[code] ?? 'Registration failed. Please try again.';
+  return map[code] ?? 'Registration failed. Please verify your information and try again.';
 }
 
 interface FormState {

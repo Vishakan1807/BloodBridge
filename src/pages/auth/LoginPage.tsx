@@ -8,15 +8,16 @@ import { Button } from '@/components/ui/Button';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { ROUTES } from '@/core/constants/routes';
 
-// ── Firebase error → human-readable message ───────────────────
 function parseFirebaseError(code: string): string {
   const map: Record<string, string> = {
-    'auth/invalid-credential':     'Invalid email or password.',
-    'auth/user-disabled':          'Your account has been disabled. Contact support.',
-    'auth/too-many-requests':      'Too many failed attempts. Try again later.',
-    'auth/network-request-failed': 'Network error. Check your connection.',
+    'auth/user-not-found':         'No account found with this email address. Please register first to access BloodBridge.',
+    'auth/invalid-credential':     'No account found with these credentials. Please check your email or register first.',
+    'auth/wrong-password':         'Incorrect password. Please check your password or click "Forgot password".',
+    'auth/user-disabled':          'Your account has been disabled. Please contact support@bloodbridge.org.',
+    'auth/too-many-requests':      'Too many failed sign-in attempts. Please try again in a few minutes.',
+    'auth/network-request-failed': 'Network connection error. Please check your internet connection.',
   };
-  return map[code] ?? 'An unexpected error occurred. Please try again.';
+  return map[code] ?? 'Unable to sign in. Please check your email or register a new account.';
 }
 
 // ── Stats for the hero panel ──────────────────────────────────
