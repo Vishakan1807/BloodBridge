@@ -34,10 +34,10 @@ import { SummaryReportPage }  from '@/pages/reports/SummaryReportPage';
 import { StatusReportPage }   from '@/pages/reports/StatusReportPage';
 import { ActivityReportPage } from '@/pages/reports/ActivityReportPage';
 import { UserManagementPage } from '@/pages/admin/UserManagementPage';
+import { RoleAssignmentPage } from '@/pages/admin/RoleAssignmentPage';
+import { AuditLogPage }      from '@/pages/admin/AuditLogPage';
+import { SystemSettingsPage } from '@/pages/admin/SystemSettingsPage';
 import { DonorHistoryPage }    from '@/pages/donor/DonorHistoryPage';
-import {
-  RoleAssignmentPage, AuditLogPage, SystemSettingsPage,
-} from '@/pages/stubs';
 
 // ── Redirect-if-auth wrapper for public routes ────────────────
 function PublicRoute({ children }: { children: React.ReactNode }) {
