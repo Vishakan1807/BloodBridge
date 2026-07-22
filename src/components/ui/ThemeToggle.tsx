@@ -109,7 +109,7 @@ export function ThemeToggle({ className = '' }: { className?: string }) {
 
       {/* ── Fancy Glassmorphic Popover Palette Menu ────────────────── */}
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-64 p-2 z-50 bg-surface-900/98 border border-surface-600/70 rounded-2xl shadow-2xl backdrop-blur-2xl animate-in fade-in zoom-in-95 duration-200 space-y-1.5">
+        <div className="absolute right-0 mt-2 w-64 p-2 z-[9999] bg-surface-900 border border-surface-600 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.9)] backdrop-blur-2xl animate-in fade-in zoom-in-95 duration-200 space-y-1.5">
           <div className="px-3 py-1.5 flex items-center justify-between border-b border-surface-700/60 mb-1">
             <span className="text-[10px] font-bold uppercase tracking-wider text-muted flex items-center gap-1">
               <Sparkles size={10} className="text-brand-400" /> Select Theme Mode
@@ -132,7 +132,7 @@ export function ThemeToggle({ className = '' }: { className?: string }) {
                   hover:scale-[1.02] hover:shadow-lg active:scale-[0.98]
                   ${isActive
                     ? `${t.accentBg} ${t.badgeBorder} shadow-md`
-                    : `bg-surface-800/40 border-surface-700/40 ${t.hoverBg}`
+                    : `bg-surface-800 border-surface-700 ${t.hoverBg}`
                   }
                 `}
               >
