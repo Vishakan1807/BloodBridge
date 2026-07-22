@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Edit, Hospital, ShieldCheck, Target, CheckCircle2, AlertCircle, PackageCheck, Clock, Radio, Phone, User } from 'lucide-react';
 import { useRequestDetail } from '../hooks/useRequestDetail';
@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { STATE_CONFIG } from '@/core/constants/workflowStates';
 import { transitionWorkflowState, rebroadcastRequest } from '@/services/workflow.service';
+import { getProfile } from '@/services/user.service';
 import { NotFoundPage } from '@/components/feedback/PageError';
 
 export function RequestDetail() {
@@ -30,6 +31,25 @@ export function RequestDetail() {
   // Rebroadcast Modal
   const [rebroadcastModalOpen, setRebroadcastModalOpen] = useState(false);
   const [rebroadcasting, setRebroadcasting]             = useState(false);
+
+  // Live Donor Phone Lookup (for records predating donorPhone field or cached donors)
+  const [donorPhones, setDonorPhones] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (!request?.individualDonations) return;
+    request.individualDonations.forEach((d) => {
+      const storedPhone = (d as any).donorPhone;
+      if (storedPhone) {
+        setDonorPhones((prev) => ({ ...prev, [d.donorUid]: storedPhone }));
+      } else if (d.donorUid) {
+        getProfile(d.donorUid).then((prof) => {
+          if (prof?.phone) {
+            setDonorPhones((prev) => ({ ...prev, [d.donorUid]: prof.phone }));
+          }
+        }).catch(() => {});
+      }
+    });
+  }, [request?.individualDonations]);
 
   // Stale request detection: donated but not closed for > 3 days
   const STALE_DAYS = 3;
@@ -319,34 +339,37 @@ export function RequestDetail() {
                     ? 'Please contact these donors to arrange blood collection. If a donor is unreachable, contact the admin via Comments & Discussion below.'
                     : 'Donors who volunteered for this request:'}
                 </p>
-                {individualDonations.map((donor, i) => (
-                  <div key={i} className="bg-brand-500/10 border border-brand-500/25 rounded-xl p-3 space-y-1.5">
-                    <div className="flex items-center gap-2">
-                      <User size={14} className="text-brand-400" />
-                      <span className="font-semibold text-white text-sm">{donor.donorName}</span>
-                      <span className="text-[10px] bg-brand-500/20 text-brand-400 px-1.5 py-0.5 rounded-full font-bold">
-                        1 unit committed
-                      </span>
+                {individualDonations.map((donor, i) => {
+                  const phone = (donor as any).donorPhone || donorPhones[donor.donorUid];
+                  return (
+                    <div key={i} className="bg-brand-500/10 border border-brand-500/25 rounded-xl p-3 space-y-1.5">
+                      <div className="flex items-center gap-2">
+                        <User size={14} className="text-brand-400" />
+                        <span className="font-semibold text-white text-sm">{donor.donorName}</span>
+                        <span className="text-[10px] bg-brand-500/20 text-brand-400 px-1.5 py-0.5 rounded-full font-bold">
+                          1 unit committed
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 ml-1">
+                        <Phone size={12} className="text-success" />
+                        {phone ? (
+                          <a
+                            href={`tel:${phone}`}
+                            className="text-success font-semibold text-sm hover:underline"
+                          >
+                            {phone}
+                          </a>
+                        ) : (
+                          <span className="text-xs text-muted italic">Fetching phone...</span>
+                        )}
+                        <span className="text-xs text-muted ml-auto">{donor.donorDistrict}</span>
+                      </div>
+                      <p className="text-[10px] text-muted">
+                        Committed on {new Date(donor.donatedAt).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                      </p>
                     </div>
-                    <div className="flex items-center gap-2 ml-1">
-                      <Phone size={12} className="text-success" />
-                      {(donor as any).donorPhone ? (
-                        <a
-                          href={`tel:${(donor as any).donorPhone}`}
-                          className="text-success font-semibold text-sm hover:underline"
-                        >
-                          {(donor as any).donorPhone}
-                        </a>
-                      ) : (
-                        <span className="text-xs text-muted italic">Phone not available</span>
-                      )}
-                      <span className="text-xs text-muted ml-auto">{donor.donorDistrict}</span>
-                    </div>
-                    <p className="text-[10px] text-muted">
-                      Committed on {new Date(donor.donatedAt).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                    </p>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
 
