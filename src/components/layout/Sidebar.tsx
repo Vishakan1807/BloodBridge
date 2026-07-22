@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, ClipboardList, ShieldCheck, Target,
@@ -9,6 +9,7 @@ import {
 import { useAuth } from '@/core/context/AuthContext';
 import { useRBAC } from '@/core/context/RBACContext';
 import { useToast } from '@/core/context/ToastContext';
+import { ConfirmDialog } from '@/components/ui/Modal';
 import { ROUTES } from '@/core/constants/routes';
 import { ROLE_LABELS } from '@/core/constants/roles';
 import type { Role } from '@/core/constants/roles';
@@ -88,13 +89,24 @@ interface SidebarProps {
 export function Sidebar({ isOpen, isCollapsed, onClose, onToggleCollapse }: SidebarProps) {
   const { userProfile, signOut } = useAuth();
   const { role }                 = useRBAC();
-  const { showSuccess }          = useToast();
+  const { showSuccess, showError } = useToast();
   const navigate                 = useNavigate();
 
+  const [showConfirmLogout, setShowConfirmLogout] = useState(false);
+  const [signingOut, setSigningOut]               = useState(false);
+
   async function handleSignOut() {
-    await signOut();
-    showSuccess('Signed out successfully.');
-    navigate(ROUTES.LOGIN, { replace: true });
+    setSigningOut(true);
+    try {
+      await signOut();
+      showSuccess('Signed out successfully.');
+      setShowConfirmLogout(false);
+      navigate(ROUTES.LOGIN, { replace: true });
+    } catch (err: any) {
+      showError(err?.message || 'Failed to sign out.');
+    } finally {
+      setSigningOut(false);
+    }
   }
 
   const displayName = userProfile?.displayName ?? userProfile?.email?.split('@')[0] ?? 'User';
@@ -207,8 +219,8 @@ export function Sidebar({ isOpen, isCollapsed, onClose, onToggleCollapse }: Side
             )}
             {!isCollapsed && (
               <button
-                onClick={handleSignOut}
-                className="text-muted hover:text-danger transition-colors p-1 rounded-md hover:bg-surface-700"
+                onClick={() => setShowConfirmLogout(true)}
+                className="text-muted hover:text-danger transition-colors p-1 rounded-md hover:bg-surface-700 cursor-pointer"
                 aria-label="Sign out"
                 title="Sign out"
               >
@@ -221,7 +233,7 @@ export function Sidebar({ isOpen, isCollapsed, onClose, onToggleCollapse }: Side
           <button
             onClick={onToggleCollapse}
             className="w-full mt-2 flex items-center justify-center gap-2 py-2 px-3 rounded-lg
-                       text-xs text-muted hover:bg-surface-700 hover:text-slate-300 transition-all"
+                       text-xs text-muted hover:bg-surface-700 hover:text-slate-300 transition-all cursor-pointer"
             aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
             {isCollapsed
@@ -293,8 +305,8 @@ export function Sidebar({ isOpen, isCollapsed, onClose, onToggleCollapse }: Side
             </div>
           </div>
           <button
-            onClick={handleSignOut}
-            className="flex items-center gap-2 text-sm text-muted hover:text-danger transition-colors"
+            onClick={() => setShowConfirmLogout(true)}
+            className="flex items-center gap-2 text-sm text-muted hover:text-danger transition-colors cursor-pointer"
           >
             <LogOut size={14} /> Sign out
           </button>
@@ -306,6 +318,17 @@ export function Sidebar({ isOpen, isCollapsed, onClose, onToggleCollapse }: Side
         'hidden lg:block shrink-0 transition-all duration-200',
         isCollapsed ? 'w-16' : 'w-60',
       ].join(' ')} aria-hidden="true" />
+
+      {/* Sign Out Confirmation Modal */}
+      <ConfirmDialog
+        isOpen={showConfirmLogout}
+        onCancel={() => setShowConfirmLogout(false)}
+        onConfirm={handleSignOut}
+        title="Sign Out Confirmation"
+        message="Are you sure you want to sign out of BloodBridge?"
+        danger
+        loading={signingOut}
+      />
     </>
   );
 }

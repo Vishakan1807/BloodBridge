@@ -16,6 +16,21 @@ import { CITY_OPTIONS } from '@/core/constants/indianCities';
 
 const cityOptions = CITY_OPTIONS;
 
+function isValidIndianPhone(phone: string): boolean {
+  if (!phone) return false;
+  const cleaned = phone.replace(/[\s\-\(\)]/g, '');
+  let normalized = cleaned;
+  if (normalized.startsWith('+91')) {
+    normalized = normalized.slice(3);
+  } else if (normalized.startsWith('91') && normalized.length > 10) {
+    normalized = normalized.slice(2);
+  }
+  if (normalized.startsWith('0')) {
+    normalized = normalized.slice(1);
+  }
+  return /^\d{8,11}$/.test(normalized);
+}
+
 function parseFirebaseError(code: string): string {
   const map: Record<string, string> = {
     'auth/email-already-in-use':   'This email ID already exists in our system. Please sign in to your existing account.',
@@ -117,8 +132,8 @@ export default function RegisterPage() {
     else if (form.password !== form.confirmPassword) errs.confirmPassword = 'Passwords do not match.';
 
     if (!form.phone)                              errs.phone = 'Phone number is required.';
-    else if (!/^(\+91)?[6-9]\d{9}$/.test(form.phone.replace(/\s/g, '')))
-      errs.phone = 'Enter a valid Indian mobile number.';
+    else if (!isValidIndianPhone(form.phone))
+      errs.phone = 'Enter a valid Indian mobile or landline number (e.g. 9876543210 or 044-28290000).';
 
     if (!form.city.trim())                        errs.city = 'District is required.';
     if (!form.bloodGroup)                         errs.bloodGroup = 'Please select your blood group.';
@@ -229,8 +244,8 @@ export default function RegisterPage() {
             <Input
               id="reg-phone"
               type="tel"
-              label="Phone Number"
-              placeholder="+91 9876543210"
+              label="Phone Number (Mobile / Landline)"
+              placeholder="Mobile or Landline (e.g. 9876543210 or 044-28290000)"
               value={form.phone}
               onChange={(e) => setField('phone', e.target.value)}
               onBlur={validate}
