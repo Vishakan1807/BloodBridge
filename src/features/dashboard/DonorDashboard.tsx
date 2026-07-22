@@ -16,6 +16,7 @@ import { ROUTES } from '@/core/constants/routes';
 import { STATE_CONFIG } from '@/core/constants/workflowStates';
 import { setDonorAvailability } from '@/services/user.service';
 import { individualDonate } from '@/services/workflow.service';
+import { isBloodCompatible } from '@/core/utils/bloodUtils';
 import { subscribeHospitals } from '@/services/master.service';
 import type { Hospital } from '@/types/master.types';
 import type { DonationRequest } from '@/types/request.types';
@@ -349,6 +350,11 @@ export function DonorDashboard() {
                         </span>
                       ) : stillNeeded <= 0 ? (
                         <span className="text-xs text-muted">This request is fully fulfilled</span>
+                      ) : !isBloodCompatible(userProfile?.bloodGroup || '', req.requiredBloodGroup) ? (
+                        <span className="text-xs text-muted bg-surface-800/80 border border-surface-600/50 px-3 py-1.5 rounded-lg flex items-center gap-1">
+                          <AlertTriangle size={13} className="text-warning shrink-0" />
+                          Incompatible Blood Group (Your Group: <strong className="text-slate-200">{userProfile?.bloodGroup || 'Not Set'}</strong>)
+                        </span>
                       ) : (
                         <Button
                           variant="primary"

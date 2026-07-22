@@ -348,6 +348,16 @@ export async function individualDonate(
     throw new Error(`Cannot donate — request is in ${request.status.toUpperCase()} state. Only VERIFIED requests accept donations.`);
   }
 
+  // 1b. Enforce clinical blood group compatibility
+  const { isBloodCompatible } = await import('@/core/utils/bloodUtils');
+  const donorBg = actor.bloodGroup || '';
+  if (!donorBg) {
+    throw new Error('Your blood group is not set on your profile.');
+  }
+  if (!isBloodCompatible(donorBg, request.requiredBloodGroup)) {
+    throw new Error(`Incompatible blood group! Your blood group (${donorBg}) cannot be donated to a recipient requiring ${request.requiredBloodGroup}.`);
+  }
+
   // 2. Check the donor hasn't donated in the last 56 days
   const FIFTY_SIX_DAYS_MS = 56 * 24 * 60 * 60 * 1000;
   const lastDonationDate  = actor.lastDonationDate ?? null;
