@@ -28,13 +28,16 @@ export async function createRequest(
   const id = newRef.key!;
 
   const now = Date.now();
+  // Broadcast district is determined primarily by the Destination Hospital's district, falling back to requester's district
+  const broadcastDistrict = dto.hospitalCity?.trim() || user.city?.trim() || '';
+
   const requestData: DonationRequest = {
     id,
     referenceNumber,
     createdBy:          user.uid,
     donorName:          user.displayName || 'Anonymous Donor',
     donorBloodGroup:    user.bloodGroup || dto.requiredBloodGroup,
-    donorCity:          user.city || '',     // Used for city-based broadcast
+    donorCity:          broadcastDistrict,   // Hospital/district used for broadcast
     requiredBloodGroup: dto.requiredBloodGroup,
     unitsRequired:      dto.unitsRequired,
     unitsFulfilled:     0,                  // Tracks partial donations progress

@@ -14,6 +14,7 @@ export async function transitionWorkflowState(
   extraData?: {
     campId?:       string;
     campName?:     string;
+    donorCity?:    string;
     matchedDonor?: { uid: string; name: string };
     allocations?:  { campId: string; campName: string; units: number }[];
     closureNotes?: string;
@@ -102,6 +103,7 @@ export async function transitionWorkflowState(
 
   if (extraData?.campId)       updates.campId = extraData.campId;
   if (extraData?.campName)     updates.campName = extraData.campName;
+  if (extraData?.donorCity)    updates.donorCity = extraData.donorCity;
   if (extraData?.allocations)  updates.allocations = extraData.allocations;
   if (extraData?.matchedDonor) {
     updates.matchedDonorUid  = extraData.matchedDonor.uid;

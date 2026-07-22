@@ -16,6 +16,8 @@ import { ROUTES } from '@/core/constants/routes';
 import { STATE_CONFIG } from '@/core/constants/workflowStates';
 import { setDonorAvailability } from '@/services/user.service';
 import { individualDonate } from '@/services/workflow.service';
+import { subscribeHospitals } from '@/services/master.service';
+import type { Hospital } from '@/types/master.types';
 import type { DonationRequest } from '@/types/request.types';
 
 interface DonorRequestSummary {
@@ -37,12 +39,18 @@ export function DonorDashboard() {
 
   const [requests, setRequests]           = useState<DonorRequestSummary[]>([]);
   const [broadcastReqs, setBroadcastReqs] = useState<DonationRequest[]>([]);
+  const [hospitals, setHospitals]         = useState<Hospital[]>([]);
   const [loading, setLoading]             = useState(true);
   const [togglingAvail, setTogglingAvail] = useState(false);
 
   // Donate modal state
   const [donateTarget, setDonateTarget] = useState<DonationRequest | null>(null);
   const [donating, setDonating]         = useState(false);
+
+  // Load hospitals from DB to resolve hospital districts live
+  useEffect(() => {
+    return subscribeHospitals((loadedHospitals) => setHospitals(loadedHospitals));
+  }, []);
 
   // ── 56-day eligibility calculation ─────────────────────────
   const lastDonationDate = userProfile?.lastDonationDate ?? null;
@@ -70,19 +78,25 @@ export function DonorDashboard() {
       setRequests(userReqs);
       setLoading(false);
 
-      // Broadcast requests in the donor's district (visible when available)
-      const district = (userProfile.city || '').toLowerCase();
+      // Broadcast requests in the donor's district (STRICT MATCH ONLY)
+      const donorDistrict = (userProfile.city || '').toLowerCase().trim();
       const visible  = allReqs.filter((r) => {
         if (r.status !== 'verified') return false;
         if (r.campId !== 'broadcast') return false;
-        if (!district) return true;
-        return (r.donorCity || '').toLowerCase() === district;
+        if (!donorDistrict) return false;
+
+        // Resolve request's district (from donorCity or hospital's district)
+        const hosp = hospitals.find((h) => h.id === r.hospitalId);
+        const reqDistrict = (r.donorCity || hosp?.city || '').toLowerCase().trim();
+
+        // STRICT MATCH ONLY!
+        return reqDistrict === donorDistrict;
       }) as DonationRequest[];
       setBroadcastReqs(visible);
     });
 
     return () => unsub();
-  }, [userProfile?.uid, userProfile?.city]);
+  }, [userProfile?.uid, userProfile?.city, hospitals]);
 
   // ── Toggle availability ──────────────────────────────────────
   const handleToggle = useCallback(async () => {

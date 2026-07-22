@@ -13,9 +13,9 @@ import { Input } from '@/components/ui/Input';
 import { Select, type SelectOption } from '@/components/ui/Select';
 import { Modal } from '@/components/ui/Modal';
 import { ROUTES } from '@/core/constants/routes';
-import { subscribeCampInventory, subscribeCamps, updateInventoryStock } from '@/services/master.service';
+import { subscribeCampInventory, subscribeCamps, subscribeHospitals, updateInventoryStock } from '@/services/master.service';
 import { partialDonate } from '@/services/workflow.service';
-import type { CampInventory, Camp } from '@/types/master.types';
+import type { CampInventory, Camp, Hospital } from '@/types/master.types';
 import type { DonationRequest } from '@/types/request.types';
 import { CLINICAL_BLOOD_GROUPS } from '@/core/utils/bloodUtils';
 
@@ -35,6 +35,7 @@ export function CoordinatorDashboard() {
 
   // City requests (broadcast requests in coordinator's city)
   const [cityRequests, setCityRequests] = useState<DonationRequest[]>([]);
+  const [hospitals, setHospitals]       = useState<Hospital[]>([]);
 
   // Stock Inward Modal
   const [stockModalOpen, setStockModalOpen]   = useState(false);
@@ -46,6 +47,11 @@ export function CoordinatorDashboard() {
   const [donateReq, setDonateReq]       = useState<DonationRequest | null>(null);
   const [donateUnits, setDonateUnits]   = useState(1);
   const [donating, setDonating]         = useState(false);
+
+  // Load hospitals from DB to resolve hospital districts live
+  useEffect(() => {
+    return subscribeHospitals((loadedHospitals) => setHospitals(loadedHospitals));
+  }, []);
 
   // Load real camps from DB
   useEffect(() => {
@@ -72,7 +78,7 @@ export function CoordinatorDashboard() {
 
   const currentCamp = camps.find((c) => c.id === selectedCampId);
 
-  // Load pending verification count and city-broadcast requests
+  // Load pending verification count and city-broadcast requests (STRICT DISTRICT MATCH ONLY)
   useEffect(() => {
     const requestsRef = ref(db, 'requests');
     return onValue(requestsRef, (snapshot) => {
@@ -84,21 +90,25 @@ export function CoordinatorDashboard() {
       const data = Object.values(snapshot.val()) as DonationRequest[];
       setPendingVerifications(data.filter((r) => r.status === 'registered').length);
 
-      // City-broadcast requests visible to this camp
-      const campCity = currentCamp?.city?.toLowerCase() || userProfile?.city?.toLowerCase() || '';
+      // District of this camp/blood bank
+      const campDistrict = (currentCamp?.city || userProfile?.city || '').toLowerCase().trim();
 
-      const cityBroadcastReqs = data.filter((r) => {
+      const districtBroadcastReqs = data.filter((r) => {
         if (r.status !== 'verified') return false;
         if (r.campId !== 'broadcast') return false;
-        // Match city — show if camp's city matches donor's city, or if no city info, show all
-        if (!campCity) return true;
-        const reqCity = (r.donorCity || '').toLowerCase();
-        return !reqCity || reqCity === campCity;
+        if (!campDistrict) return false;
+
+        // Resolve request's district (from donorCity or from destination hospital's district)
+        const hosp = hospitals.find((h) => h.id === r.hospitalId);
+        const reqDistrict = (r.donorCity || hosp?.city || '').toLowerCase().trim();
+
+        // STRICT MATCH: Only show if request district matches camp district exactly!
+        return reqDistrict === campDistrict;
       });
 
-      setCityRequests(cityBroadcastReqs);
+      setCityRequests(districtBroadcastReqs);
     });
-  }, [selectedCampId, currentCamp, userProfile]);
+  }, [selectedCampId, currentCamp, userProfile, hospitals]);
 
   // Computed values
   const totalUnits   = Object.values(inventory).reduce((sum, item) => sum + (item.units || 0), 0);

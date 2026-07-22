@@ -3,25 +3,31 @@ import { ShieldCheck, CheckCircle2, Radio } from 'lucide-react';
 import { useAuth } from '@/core/context/AuthContext';
 import { useToast } from '@/core/context/ToastContext';
 import { useRequests } from '@/features/requests/hooks/useRequests';
-import { subscribeCamps } from '@/services/master.service';
+import { subscribeCamps, subscribeHospitals } from '@/services/master.service';
 import { transitionWorkflowState } from '@/services/workflow.service';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
-import type { Camp } from '@/types/master.types';
+import type { Camp, Hospital } from '@/types/master.types';
 import type { DonationRequest } from '@/types/request.types';
 
 export function VerificationQueue() {
   const { userProfile } = useAuth();
   const { showSuccess, showError } = useToast();
   const { requests, loading } = useRequests();
-  const [camps, setCamps] = useState<Camp[]>([]);
+  const [camps, setCamps]         = useState<Camp[]>([]);
+  const [hospitals, setHospitals] = useState<Hospital[]>([]);
 
   const [selectedReq, setSelectedReq]   = useState<DonationRequest | null>(null);
   const [verifying, setVerifying]         = useState(false);
 
   useEffect(() => {
-    return subscribeCamps((list) => setCamps(list.filter((c) => c.isActive)));
+    const unsubCamps = subscribeCamps((list) => setCamps(list.filter((c) => c.isActive)));
+    const unsubHosps = subscribeHospitals((list) => setHospitals(list));
+    return () => {
+      unsubCamps();
+      unsubHosps();
+    };
   }, []);
 
   const pendingRequests = requests.filter((r) => r.status === 'registered');
@@ -34,21 +40,23 @@ export function VerificationQueue() {
   async function handleBroadcast() {
     if (!selectedReq || !userProfile) return;
 
-    const city = selectedReq.donorCity || userProfile.city || '';
-    const cityCamps = campsInCity(city);
+    const hosp = hospitals.find((h) => h.id === selectedReq.hospitalId);
+    const district = selectedReq.donorCity || hosp?.city || userProfile.city || '';
+    const cityCamps = campsInCity(district);
     const campSummary = cityCamps.length > 0
       ? cityCamps.map((c) => c.name).join(', ')
-      : 'All registered blood banks (no camps in city yet)';
+      : `No registered blood banks in ${district} yet`;
 
     setVerifying(true);
     try {
       await transitionWorkflowState(selectedReq.id, 'verified', userProfile, {
-        campId:   'broadcast',
-        campName: `Broadcast — ${city || 'All Cities'}`,
-        note:     `Verified and broadcast to ${cityCamps.length} blood bank(s) in ${city}: ${campSummary}`,
+        campId:    'broadcast',
+        campName:  `Broadcast — ${district || 'District'}`,
+        donorCity: district,   // Ensure donorCity is explicitly saved
+        note:      `Verified and broadcast to ${cityCamps.length} blood bank(s) in ${district}: ${campSummary}`,
       });
       showSuccess(
-        `Request ${selectedReq.referenceNumber} verified & broadcast to ${cityCamps.length || 'all'} blood bank(s) in ${city}!`,
+        `Request ${selectedReq.referenceNumber} verified & broadcast to ${cityCamps.length} blood bank(s) in ${district}!`,
       );
       setSelectedReq(null);
     } catch (err: any) {

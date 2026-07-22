@@ -63,6 +63,7 @@ export interface CreateRequestDTO {
   urgency:            UrgencyLevel;
   hospitalId:         string;
   hospitalName:       string;
+  hospitalCity?:      string;   // District of the assigned destination hospital
   patientName:        string;
   requiredByDate:     number;
   notes?:             string;

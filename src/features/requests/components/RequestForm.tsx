@@ -92,6 +92,7 @@ export function RequestForm({ initialData, isEditMode = false }: RequestFormProp
           urgency,
           hospitalId,
           hospitalName: selectedHosp?.name || initialData.hospitalName,
+          donorCity: selectedHosp?.city || initialData.donorCity,
           requiredByDate: dateTimestamp,
           notes: notes.trim(),
         });
@@ -106,6 +107,7 @@ export function RequestForm({ initialData, isEditMode = false }: RequestFormProp
             urgency,
             hospitalId,
             hospitalName: selectedHosp?.name || 'Selected Hospital',
+            hospitalCity: selectedHosp?.city,
             requiredByDate: dateTimestamp,
             notes: notes.trim(),
           },
