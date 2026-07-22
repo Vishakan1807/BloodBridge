@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Edit, Hospital, ShieldCheck, Target, CheckCircle2, AlertCircle, PackageCheck, Clock } from 'lucide-react';
+import { ArrowLeft, Edit, Hospital, ShieldCheck, Target, CheckCircle2, AlertCircle, PackageCheck, Clock, Radio, Phone, User } from 'lucide-react';
 import { useRequestDetail } from '../hooks/useRequestDetail';
 import { useAuth } from '@/core/context/AuthContext';
 import { useToast } from '@/core/context/ToastContext';
@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { STATE_CONFIG } from '@/core/constants/workflowStates';
-import { transitionWorkflowState } from '@/services/workflow.service';
+import { transitionWorkflowState, rebroadcastRequest } from '@/services/workflow.service';
 import { NotFoundPage } from '@/components/feedback/PageError';
 
 export function RequestDetail() {
@@ -23,9 +23,13 @@ export function RequestDetail() {
   const navigate = useNavigate();
 
   // Workflow Transition Modal States
-  const [closeModalOpen, setCloseModalOpen]   = useState(false);
-  const [closureNotes, setClosureNotes]         = useState('');
-  const [transitioning, setTransitioning]       = useState(false);
+  const [closeModalOpen, setCloseModalOpen]         = useState(false);
+  const [closureNotes, setClosureNotes]               = useState('');
+  const [transitioning, setTransitioning]             = useState(false);
+
+  // Rebroadcast Modal
+  const [rebroadcastModalOpen, setRebroadcastModalOpen] = useState(false);
+  const [rebroadcasting, setRebroadcasting]             = useState(false);
 
   // Stale request detection: donated but not closed for > 3 days
   const STALE_DAYS = 3;
@@ -33,7 +37,7 @@ export function RequestDetail() {
   const staleDays  = donatedAt
     ? Math.floor((Date.now() - donatedAt) / (1000 * 60 * 60 * 24))
     : 0;
-  const isStale    = request?.status === 'donated' && staleDays >= STALE_DAYS;
+  const isStale = request?.status === 'donated' && staleDays >= STALE_DAYS;
 
   if (loading) {
     return (
@@ -49,20 +53,23 @@ export function RequestDetail() {
     return <NotFoundPage />;
   }
 
-  const isOwner = userProfile?.uid === request.createdBy;
-  const isAdmin = userProfile?.role === 'admin';
+  const isOwner   = userProfile?.uid === request.createdBy;
+  const isAdmin   = userProfile?.role === 'admin';
   const isManager = userProfile?.role === 'manager';
-  const canEdit = (isOwner || isAdmin) && request.status === 'registered';
+  const canEdit   = (isOwner || isAdmin) && request.status === 'registered';
 
   const stateCfg = STATE_CONFIG[request.status];
 
-  // Workflow Action Handlers
+  // Individual donations on this request
+  const individualDonations = request.individualDonations || [];
+  const partialDonations    = request.partialDonations    || [];
+
   async function handleRecordDonation() {
     if (!userProfile || !request) return;
     setTransitioning(true);
     try {
       await transitionWorkflowState(request.id, 'donated', userProfile);
-      showSuccess(`Donation event recorded for request ${request.referenceNumber}! Stock decremented.`);
+      showSuccess(`Donation event recorded for request ${request.referenceNumber}!`);
     } catch (err: any) {
       showError(err?.message || 'Failed to record donation.');
     } finally {
@@ -89,6 +96,20 @@ export function RequestDetail() {
     }
   }
 
+  async function handleRebroadcast() {
+    if (!userProfile || !request) return;
+    setRebroadcasting(true);
+    try {
+      await rebroadcastRequest(request.id, userProfile);
+      showSuccess(`Request ${request.referenceNumber} has been rebroadcast. All eligible donors and blood banks in ${request.donorCity} will see the updated requirement.`);
+      setRebroadcastModalOpen(false);
+    } catch (err: any) {
+      showError(err?.message || 'Failed to rebroadcast request.');
+    } finally {
+      setRebroadcasting(false);
+    }
+  }
+
   return (
     <div className="space-y-6 max-w-4xl mx-auto page-enter">
       {/* Top Nav & Action Header */}
@@ -100,7 +121,7 @@ export function RequestDetail() {
           <ArrowLeft size={16} /> Back to Requests
         </button>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           {canEdit && (
             <Link to={`/requests/${request.id}/edit`}>
               <Button variant="secondary" size="sm" icon={<Edit size={16} />}>
@@ -141,6 +162,19 @@ export function RequestDetail() {
             </>
           )}
 
+          {/* Admin only: Rebroadcast button (reset individual donors & re-open) */}
+          {isAdmin && (request.status === 'verified' || request.status === 'donated') &&
+            individualDonations.length > 0 && (
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={<Radio size={16} />}
+              onClick={() => setRebroadcastModalOpen(true)}
+            >
+              Rebroadcast Request
+            </Button>
+          )}
+
           {/* Donor: Confirm Blood Received & Close */}
           {isOwner && request.status === 'donated' && (
             <Button
@@ -167,19 +201,15 @@ export function RequestDetail() {
                 {stateCfg.label}
               </span>
             </div>
-            <p className="text-xs text-muted mt-1">
-              Raised by <strong className="text-slate-300">{request.donorName}</strong> on {new Date(request.createdAt).toLocaleDateString()}
+            <p className="text-muted text-xs mt-1">
+              Raised by <strong className="text-slate-300">{request.donorName}</strong> on{' '}
+              {new Date(request.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
             </p>
           </div>
-
-          <div className="flex items-center gap-4">
-            <div className="text-right">
-              <p className="text-xs text-muted">Blood Group Needed</p>
-              <p className="font-display font-bold text-2xl text-white">
-                {request.requiredBloodGroup}{' '}
-                <span className="text-sm font-normal text-muted">({request.unitsRequired} units)</span>
-              </p>
-            </div>
+          <div className="text-right">
+            <p className="text-xs text-muted">Blood Group Needed</p>
+            <p className="font-display font-black text-3xl text-white">{request.requiredBloodGroup}</p>
+            <span className="text-sm font-normal text-muted">({request.unitsRequired} units)</span>
           </div>
         </div>
 
@@ -192,10 +222,10 @@ export function RequestDetail() {
 
       {/* Details Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Recipient / Patient Details */}
+        {/* Patient / Clinical Details */}
         <Card padding="md" className="space-y-3">
           <h3 className="font-display font-semibold text-base text-white border-b border-surface-700 pb-2">
-            Patient & Clinical Details
+            Patient &amp; Clinical Details
           </h3>
 
           <div className="text-sm space-y-2">
@@ -219,7 +249,6 @@ export function RequestDetail() {
                 <span className="font-semibold text-success text-right">{request.matchedDonorName}</span>
               </div>
             )}
-
             {request.allocations && request.allocations.length > 0 && (
               <div className="pt-2 border-t border-surface-700 space-y-1.5">
                 <span className="text-xs text-muted font-semibold uppercase tracking-wider block">
@@ -245,7 +274,7 @@ export function RequestDetail() {
           )}
         </Card>
 
-        {/* Destination Hospital Details */}
+        {/* Destination Hospital + Donor contacts */}
         <Card padding="md" className="space-y-3">
           <h3 className="font-display font-semibold text-base text-white border-b border-surface-700 pb-2 flex items-center gap-2">
             <Hospital size={18} className="text-brand-400" /> Destination Hospital
@@ -264,6 +293,63 @@ export function RequestDetail() {
               </div>
             )}
 
+            {/* Blood Bank Contributions */}
+            {partialDonations.length > 0 && (
+              <div className="pt-2 border-t border-surface-700 space-y-1.5">
+                <span className="text-xs text-muted font-semibold uppercase tracking-wider block">
+                  🏢 Blood Bank Contributions:
+                </span>
+                {partialDonations.map((pd, i) => (
+                  <div key={i} className="flex justify-between text-xs bg-success/10 px-2.5 py-1.5 rounded-lg border border-success/20">
+                    <span className="text-slate-200">{pd.campName}</span>
+                    <span className="font-bold text-success">{pd.units} unit(s)</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Individual Donor Contact Cards — visible to requester and admin */}
+            {individualDonations.length > 0 && (isOwner || isAdmin || isManager) && (
+              <div className="pt-2 border-t border-surface-700 space-y-2">
+                <span className="text-xs font-semibold uppercase tracking-wider text-brand-400 block flex items-center gap-1">
+                  👤 Individual Donors — Contact Details
+                </span>
+                <p className="text-[10px] text-muted">
+                  {isOwner
+                    ? 'Please contact these donors to arrange blood collection. If a donor is unreachable, contact the admin via Comments & Discussion below.'
+                    : 'Donors who volunteered for this request:'}
+                </p>
+                {individualDonations.map((donor, i) => (
+                  <div key={i} className="bg-brand-500/10 border border-brand-500/25 rounded-xl p-3 space-y-1.5">
+                    <div className="flex items-center gap-2">
+                      <User size={14} className="text-brand-400" />
+                      <span className="font-semibold text-white text-sm">{donor.donorName}</span>
+                      <span className="text-[10px] bg-brand-500/20 text-brand-400 px-1.5 py-0.5 rounded-full font-bold">
+                        1 unit committed
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 ml-1">
+                      <Phone size={12} className="text-success" />
+                      {(donor as any).donorPhone ? (
+                        <a
+                          href={`tel:${(donor as any).donorPhone}`}
+                          className="text-success font-semibold text-sm hover:underline"
+                        >
+                          {(donor as any).donorPhone}
+                        </a>
+                      ) : (
+                        <span className="text-xs text-muted italic">Phone not available</span>
+                      )}
+                      <span className="text-xs text-muted ml-auto">{donor.donorDistrict}</span>
+                    </div>
+                    <p className="text-[10px] text-muted">
+                      Committed on {new Date(donor.donatedAt).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+
             {request.closureNotes && (
               <div className="pt-2 border-t border-surface-700">
                 <span className="text-muted text-xs">Case Closure Notes:</span>
@@ -271,17 +357,6 @@ export function RequestDetail() {
               </div>
             )}
           </div>
-        </Card>
-      </div>
-
-      {/* Embedded Comments & Attachments Modules */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card padding="md">
-          <CommentThread requestId={request.id} />
-        </Card>
-
-        <Card padding="md">
-          <AttachmentPanel requestId={request.id} />
         </Card>
       </div>
 
@@ -301,7 +376,18 @@ export function RequestDetail() {
         </div>
       )}
 
-      {/* Close Request Case Modal */}
+      {/* Comments & Attachments */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <Card padding="md">
+          <CommentThread requestId={request.id} />
+        </Card>
+
+        <Card padding="md">
+          <AttachmentPanel requestId={request.id} />
+        </Card>
+      </div>
+
+      {/* ── Close Request Modal ─────────────────────────────── */}
       <Modal
         isOpen={closeModalOpen}
         onClose={() => setCloseModalOpen(false)}
@@ -326,18 +412,63 @@ export function RequestDetail() {
             label={isOwner && !isAdmin && !isManager ? 'Confirmation Notes (e.g. Blood received at hospital)' : 'Mandatory Closure Notes'}
             placeholder={isOwner && !isAdmin && !isManager
               ? 'e.g. All 3 units received at Apollo Hospital. Transfusion completed.'
-              : 'e.g. Donation completed successfully at Red Cross Camp.'}
+              : 'e.g. Donation completed successfully.'}
             value={closureNotes}
             onChange={(e) => setClosureNotes(e.target.value)}
             required
           />
 
           <div className="flex justify-end gap-3 pt-4 border-t border-surface-700">
-            <Button variant="ghost" onClick={() => setCloseModalOpen(false)}>
-              Cancel
-            </Button>
+            <Button variant="ghost" onClick={() => setCloseModalOpen(false)}>Cancel</Button>
             <Button variant="primary" onClick={handleConfirmClose} loading={transitioning}>
               {isOwner && !isAdmin && !isManager ? 'Confirm & Close Case' : 'Confirm Case Closure'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* ── Rebroadcast Modal ───────────────────────────────── */}
+      <Modal
+        isOpen={rebroadcastModalOpen}
+        onClose={() => setRebroadcastModalOpen(false)}
+        title={`Rebroadcast Request — ${request.referenceNumber}`}
+      >
+        <div className="space-y-4">
+          <div className="bg-warning/10 border border-warning/30 rounded-xl p-4 text-xs text-slate-300 space-y-2">
+            <p className="font-semibold text-warning text-sm flex items-center gap-2">
+              <Radio size={15} /> Emergency Rebroadcast
+            </p>
+            <p>
+              Use this when a committed donor is <strong>unreachable or unable to donate</strong>.
+              This will:
+            </p>
+            <ul className="list-disc list-inside space-y-1 text-muted ml-1">
+              <li>Reset all individual donor commitments for this request</li>
+              <li>Restore the required units back to <strong className="text-white">{request.unitsRequired} unit(s)</strong></li>
+              <li>Rebroadcast to all available donors and blood banks in <strong className="text-white">{request.donorCity}</strong></li>
+            </ul>
+            <p className="text-warning font-semibold mt-2">
+              ⚠️ Only do this after confirming the donor is truly unreachable via the Comments section.
+            </p>
+          </div>
+
+          {/* Show who will be removed */}
+          {individualDonations.length > 0 && (
+            <div className="space-y-1.5">
+              <p className="text-xs text-muted font-semibold uppercase tracking-wider">Donor commitments to be reset:</p>
+              {individualDonations.map((d, i) => (
+                <div key={i} className="flex justify-between text-xs bg-surface-700/50 px-3 py-2 rounded-lg border border-danger/20">
+                  <span className="text-slate-200">👤 {d.donorName} ({d.donorDistrict})</span>
+                  <span className="text-danger font-bold">Will be removed</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="flex justify-end gap-3 pt-4 border-t border-surface-700">
+            <Button variant="ghost" onClick={() => setRebroadcastModalOpen(false)}>Cancel</Button>
+            <Button variant="primary" icon={<Radio size={16} />} loading={rebroadcasting} onClick={handleRebroadcast}>
+              Confirm Rebroadcast
             </Button>
           </div>
         </div>

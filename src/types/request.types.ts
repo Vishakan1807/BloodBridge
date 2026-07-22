@@ -21,8 +21,9 @@ export interface PartialDonation {
 export interface IndividualDonation {
   donorUid:      string;
   donorName:     string;
+  donorPhone:    string;   // Contact number shown to requester
   donorDistrict: string;
-  units:         1;      // Always exactly 1 unit (WHO norm)
+  units:         1;        // Always exactly 1 unit (WHO norm)
   donatedAt:     number;
 }
 
