@@ -16,7 +16,7 @@ import { ROUTES } from '@/core/constants/routes';
 import { STATE_CONFIG } from '@/core/constants/workflowStates';
 import { setDonorAvailability } from '@/services/user.service';
 import { individualDonate } from '@/services/workflow.service';
-import { isBloodCompatible } from '@/core/utils/bloodUtils';
+import { isBloodCompatible, sortByUrgencyAndDate } from '@/core/utils/bloodUtils';
 import { subscribeHospitals } from '@/services/master.service';
 import type { Hospital } from '@/types/master.types';
 import type { DonationRequest } from '@/types/request.types';
@@ -93,7 +93,7 @@ export function DonorDashboard() {
         // STRICT MATCH ONLY!
         return reqDistrict === donorDistrict;
       }) as DonationRequest[];
-      setBroadcastReqs(visible);
+      setBroadcastReqs(sortByUrgencyAndDate(visible));
     });
 
     return () => unsub();

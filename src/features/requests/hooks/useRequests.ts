@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { subscribeRequests } from '@/services/request.service';
 import { useAuth } from '@/core/context/AuthContext';
+import { sortByUrgencyAndDate } from '@/core/utils/bloodUtils';
 import type { DonationRequest, RequestFilters } from '@/types/request.types';
 
 export function useRequests() {
@@ -59,7 +60,8 @@ export function useRequests() {
       );
     }
 
-    return list;
+    // Sort by Urgency Level (Critical -> Urgent -> Normal) then newest timestamp
+    return sortByUrgencyAndDate(list);
   }, [allRequests, userProfile, filters]);
 
   return {

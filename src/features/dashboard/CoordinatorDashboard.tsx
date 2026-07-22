@@ -15,6 +15,7 @@ import { Modal } from '@/components/ui/Modal';
 import { ROUTES } from '@/core/constants/routes';
 import { subscribeCampInventory, subscribeCamps, subscribeHospitals, updateInventoryStock } from '@/services/master.service';
 import { partialDonate } from '@/services/workflow.service';
+import { sortByUrgencyAndDate } from '@/core/utils/bloodUtils';
 import type { CampInventory, Camp, Hospital } from '@/types/master.types';
 import type { DonationRequest } from '@/types/request.types';
 import { CLINICAL_BLOOD_GROUPS } from '@/core/utils/bloodUtils';
@@ -106,7 +107,7 @@ export function CoordinatorDashboard() {
         return reqDistrict === campDistrict;
       });
 
-      setCityRequests(districtBroadcastReqs);
+      setCityRequests(sortByUrgencyAndDate(districtBroadcastReqs));
     });
   }, [selectedCampId, currentCamp, userProfile, hospitals]);
 

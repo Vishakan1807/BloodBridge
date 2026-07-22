@@ -55,3 +55,21 @@ export function isBloodCompatible(donorGroup: string, recipientGroup: string): b
 
   return false;
 }
+
+// ── Urgency Level Priority Sorting (Critical -> Urgent -> Normal) ──────────────
+const URGENCY_PRIORITY: Record<string, number> = {
+  critical: 3,
+  urgent:   2,
+  normal:   1,
+};
+
+export function sortByUrgencyAndDate<T extends { urgency?: string; createdAt?: number }>(requests: T[]): T[] {
+  return [...requests].sort((a, b) => {
+    const prioA = URGENCY_PRIORITY[(a.urgency || '').toLowerCase()] || 1;
+    const prioB = URGENCY_PRIORITY[(b.urgency || '').toLowerCase()] || 1;
+    if (prioA !== prioB) {
+      return prioB - prioA; // Higher priority (critical=3, urgent=2) first
+    }
+    return (b.createdAt || 0) - (a.createdAt || 0); // Newest timestamp second
+  });
+}
