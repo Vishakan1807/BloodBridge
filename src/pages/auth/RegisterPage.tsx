@@ -38,6 +38,9 @@ function parseFirebaseError(code: string): string {
     'auth/weak-password':          'Password is too weak. Please use at least 8 characters.',
     'auth/network-request-failed': 'Network connection error. Please check your internet connection.',
     'auth/too-many-requests':      'Too many registration attempts. Please try again later.',
+    'auth/unauthorized-domain':    'Google Sign-In Domain Error: Please add your domain (e.g. localhost or vercel app URL) in Firebase Console -> Authentication -> Settings -> Authorized domains.',
+    'auth/popup-closed-by-user':   'Google Sign-In popup was closed before completing.',
+    'auth/popup-blocked':          'Google Sign-In popup was blocked by your browser settings.',
   };
   return map[code] ?? 'Registration failed. Please verify your information and try again.';
 }
@@ -75,7 +78,7 @@ export default function RegisterPage() {
       showSuccess('Successfully signed in with Google! 🩸');
       navigate(ROUTES.DASHBOARD);
     } catch (err: any) {
-      showError(err?.message || 'Google Sign-In failed.');
+      showError(parseFirebaseError(err?.code || ''));
     } finally {
       setGoogleLoading(false);
     }

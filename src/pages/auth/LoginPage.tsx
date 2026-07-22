@@ -16,8 +16,11 @@ function parseFirebaseError(code: string): string {
     'auth/user-disabled':          'Your account has been disabled. Please contact support@bloodbridge.org.',
     'auth/too-many-requests':      'Too many failed sign-in attempts. Please try again in a few minutes.',
     'auth/network-request-failed': 'Network connection error. Please check your internet connection.',
+    'auth/unauthorized-domain':    'Google Sign-In Domain Error: Please add your domain (e.g. localhost or vercel app URL) in Firebase Console -> Authentication -> Settings -> Authorized domains.',
+    'auth/popup-closed-by-user':   'Google Sign-In popup was closed before completing.',
+    'auth/popup-blocked':          'Google Sign-In popup was blocked by your browser settings.',
   };
-  return map[code] ?? 'Unable to sign in. Please check your email or register a new account.';
+  return map[code] ?? 'Unable to sign in with Google. Please try again or use email sign in.';
 }
 
 // ── Highlights for the hero panel ──────────────────────────────
@@ -50,7 +53,7 @@ export default function LoginPage() {
       showSuccess('Successfully signed in with Google! 🩸');
       navigate(from, { replace: true });
     } catch (err: any) {
-      showError(err?.message || 'Google Sign-In failed.');
+      showError(parseFirebaseError(err?.code || ''));
     } finally {
       setGoogleLoading(false);
     }
