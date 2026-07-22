@@ -43,6 +43,12 @@ const NAV_SECTIONS: NavSection[] = [
       { label: 'My Requests',       path: ROUTES.REQUESTS,        icon: <ClipboardList size={18} />, allowedRoles: ['user'] },
       { label: 'Verify Donors',     path: ROUTES.WORKFLOW_VERIFY, icon: <ShieldCheck size={18} />,  allowedRoles: ['admin', 'manager'] },
       { label: 'Match Donors',      path: ROUTES.WORKFLOW_MATCH,  icon: <Target size={18} />,        allowedRoles: ['admin', 'manager'] },
+    ],
+  },
+  {
+    title: 'Settings',
+    allowedRoles: ['admin', 'manager', 'user'],
+    items: [
       { label: 'Profile & Location', path: ROUTES.SETTINGS,       icon: <Settings size={18} />,      allowedRoles: ['admin', 'manager', 'user'] },
     ],
   },
