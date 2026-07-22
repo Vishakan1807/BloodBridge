@@ -2,8 +2,9 @@ import { ref, set, push, update, get } from 'firebase/database';
 import { db } from '@/core/config/firebase';
 import { ALLOWED_TRANSITIONS, type WorkflowState } from '@/core/constants/workflowStates';
 import { updateInventoryStock } from '@/services/master.service';
+import { recordDonorLastDonation } from '@/services/user.service';
 import type { UserProfile } from '@/types/auth.types';
-import type { DonationRequest, PartialDonation } from '@/types/request.types';
+import type { DonationRequest, PartialDonation, IndividualDonation } from '@/types/request.types';
 
 // ── Standard Workflow State Transition ────────────────────────
 export async function transitionWorkflowState(
@@ -303,6 +304,144 @@ export async function partialDonate(
         const message = fullyFulfilled
           ? `All ${request.unitsRequired} unit(s) of ${request.requiredBloodGroup} for ${request.patientName} are now fully allocated! Collect from the respective blood banks for transfusion at ${request.hospitalName}.`
           : `${campName} has donated ${units} unit(s) of ${request.requiredBloodGroup} for ${request.patientName}. ${newUnitsFulfilled} of ${request.unitsRequired} units fulfilled so far. ${stillNeeded - units} unit(s) still needed.`;
+
+        await sendNotification({
+          recipientUid:   requester.uid,
+          recipientEmail: requester.email,
+          recipientPhone: requester.phone,
+          recipientName:  requester.displayName,
+          title,
+          message,
+          channel:        'both',
+          requestId,
+          refNumber:      request.referenceNumber,
+        });
+      }
+    }
+  } catch (notifErr) {
+    console.error('Notification dispatch failed:', notifErr);
+  }
+
+  return { fulfilled: fullyFulfilled, unitsFulfilled: newUnitsFulfilled };
+}
+
+// ── Individual Voluntary Donor Donation (FCFS, max 1 unit per donor) ──────────
+export async function individualDonate(
+  requestId: string,
+  actor:     UserProfile,           // Must be role='user' (the donor themselves)
+): Promise<{ fulfilled: boolean; unitsFulfilled: number }> {
+  // Enforce only regular users can use this path
+  if (actor.role !== 'user') {
+    throw new Error('Only registered individual donors can use this donation path.');
+  }
+
+  const reqRef   = ref(db, `requests/${requestId}`);
+  const snapshot = await get(reqRef);
+  if (!snapshot.exists()) throw new Error('Request not found.');
+
+  const request = snapshot.val() as DonationRequest;
+
+  // 1. Request must be in broadcast-verified state
+  if (request.status !== 'verified') {
+    throw new Error(`Cannot donate — request is in ${request.status.toUpperCase()} state. Only VERIFIED requests accept donations.`);
+  }
+
+  // 2. Check the donor hasn't donated in the last 56 days
+  const FIFTY_SIX_DAYS_MS = 56 * 24 * 60 * 60 * 1000;
+  const lastDonationDate  = actor.lastDonationDate ?? null;
+  if (lastDonationDate && (Date.now() - lastDonationDate) < FIFTY_SIX_DAYS_MS) {
+    const daysRemaining = Math.ceil((FIFTY_SIX_DAYS_MS - (Date.now() - lastDonationDate)) / (1000 * 60 * 60 * 24));
+    throw new Error(`You are within the mandatory 56-day recovery period. You can donate again in ${daysRemaining} day(s).`);
+  }
+
+  // 3. Check this donor hasn't already donated to this exact request
+  const existingIndividual = (request.individualDonations || []).find(
+    (d) => d.donorUid === actor.uid,
+  );
+  if (existingIndividual) {
+    throw new Error('You have already donated 1 unit to this request.');
+  }
+
+  // 4. Check the request still needs more units
+  const alreadyFulfilled = request.unitsFulfilled || 0;
+  const stillNeeded      = request.unitsRequired - alreadyFulfilled;
+  if (stillNeeded <= 0) {
+    throw new Error('This request has already been fully fulfilled by other donors and blood banks.');
+  }
+
+  // 5. Record the donation (individual donors always donate exactly 1 unit)
+  const newDonation: IndividualDonation = {
+    donorUid:      actor.uid,
+    donorName:     actor.displayName,
+    donorDistrict: actor.city || '',
+    units:         1,
+    donatedAt:     Date.now(),
+  };
+
+  const newIndividualDonations = [...(request.individualDonations || []), newDonation];
+  const newUnitsFulfilled      = alreadyFulfilled + 1;
+  const fullyFulfilled         = newUnitsFulfilled >= request.unitsRequired;
+  const now                    = Date.now();
+
+  const updates: Partial<DonationRequest> & Record<string, any> = {
+    individualDonations: newIndividualDonations,
+    unitsFulfilled:      newUnitsFulfilled,
+    updatedAt:           now,
+  };
+
+  if (fullyFulfilled) {
+    updates.status    = 'donated' as WorkflowState;
+    updates.donatedAt = now;
+  }
+
+  await update(reqRef, updates);
+
+  // 6. Lock the donor for 56 days and auto-toggle availability OFF
+  await recordDonorLastDonation(actor.uid);
+
+  // Workflow history
+  const wfHistRef = push(ref(db, `workflow/${requestId}`));
+  await set(wfHistRef, {
+    fromState: 'verified',
+    toState:   fullyFulfilled ? 'donated' : 'verified',
+    actorUid:  actor.uid,
+    actorName: actor.displayName,
+    actorRole: actor.role,
+    note:      `Individual donor ${actor.displayName} (${actor.city}) donated 1 unit of ${request.requiredBloodGroup}. Total fulfilled: ${newUnitsFulfilled}/${request.unitsRequired}.`,
+    timestamp: now,
+  });
+
+  // Audit entry
+  const auditRef = push(ref(db, 'audit'));
+  await set(auditRef, {
+    id:            auditRef.key,
+    type:          'INDIVIDUAL_DONATION',
+    action:        'DONOR_INDIVIDUAL_DONATE',
+    actorUid:      actor.uid,
+    actorName:     actor.displayName,
+    actorRole:     actor.role,
+    targetId:      requestId,
+    targetType:    'request',
+    previousValue: { unitsFulfilled: alreadyFulfilled },
+    newValue:      { unitsFulfilled: newUnitsFulfilled, donorUid: actor.uid, units: 1 },
+    metadata:      { referenceNumber: request.referenceNumber },
+    timestamp:     now,
+  });
+
+  // Notify requester
+  try {
+    const { sendNotification } = await import('@/services/notification.service');
+    const { getProfile }       = await import('@/services/user.service');
+
+    if (request.createdBy) {
+      const requester = await getProfile(request.createdBy);
+      if (requester) {
+        const title = fullyFulfilled
+          ? `💉 [BloodBridge] All Units Allocated — ${request.referenceNumber}`
+          : `🩸 [BloodBridge] Individual Donor Stepped Up — ${request.referenceNumber}`;
+        const message = fullyFulfilled
+          ? `All ${request.unitsRequired} unit(s) of ${request.requiredBloodGroup} for ${request.patientName} are fully allocated! Please coordinate transfusion at ${request.hospitalName}.`
+          : `${actor.displayName} from ${actor.city} has volunteered to donate 1 unit of ${request.requiredBloodGroup} for ${request.patientName}. ${newUnitsFulfilled}/${request.unitsRequired} units secured so far.`;
 
         await sendNotification({
           recipientUid:   requester.uid,

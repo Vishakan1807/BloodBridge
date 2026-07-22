@@ -17,6 +17,15 @@ export interface PartialDonation {
   donatedBy: string; // coordinator uid
 }
 
+// Tracks each individual voluntary donor's contribution (max 1 unit per donor)
+export interface IndividualDonation {
+  donorUid:      string;
+  donorName:     string;
+  donorDistrict: string;
+  units:         1;      // Always exactly 1 unit (WHO norm)
+  donatedAt:     number;
+}
+
 export interface DonationRequest {
   id:                 string;
   referenceNumber:    string;   // BB-YYYY-NNNNN
@@ -38,9 +47,10 @@ export interface DonationRequest {
   campName:           string | null;
   matchedDonorUid:    string | null;
   matchedDonorName:   string | null;
-  allocations?:       CampAllocation[] | null;
-  partialDonations?:  PartialDonation[] | null;  // Each camp's contribution
-  donatedAt:          number | null;
+  allocations?:          CampAllocation[] | null;
+  partialDonations?:     PartialDonation[] | null;     // Each blood bank's contribution
+  individualDonations?:  IndividualDonation[] | null;  // Each individual donor's contribution
+  donatedAt:             number | null;
   closureNotes:       string | null;
   createdAt:          number;
   updatedAt:          number;

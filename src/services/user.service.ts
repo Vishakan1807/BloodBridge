@@ -74,3 +74,40 @@ export async function checkEmailExists(email: string): Promise<boolean> {
   const normalized = email.trim().toLowerCase();
   return users.some((u) => u.email && u.email.trim().toLowerCase() === normalized);
 }
+
+// ── Donor Availability Toggle ─────────────────────────────────
+// Donor opts in/out of the broadcast network
+export async function setDonorAvailability(
+  uid: string,
+  isAvailable: boolean,
+): Promise<void> {
+  await update(ref(db, `users/${uid}`), {
+    isAvailableToDonate: isAvailable,
+    updatedAt: Date.now(),
+  });
+}
+
+// ── Record Last Donation Date (enforces 56-day lock) ─────────
+// Called after a donor successfully completes an individual donation
+export async function recordDonorLastDonation(uid: string): Promise<void> {
+  await update(ref(db, `users/${uid}`), {
+    lastDonationDate:    Date.now(),
+    isAvailableToDonate: false,   // Auto-toggle off after donating
+    updatedAt:           Date.now(),
+  });
+}
+
+// ── Get donors available in a given district ─────────────────
+// Used by admin/broadcast panel to count available donors
+export async function getAvailableDonorsInDistrict(district: string): Promise<UserProfile[]> {
+  const snapshot = await get(ref(db, 'users'));
+  if (!snapshot.exists()) return [];
+  const users = Object.values(snapshot.val()) as UserProfile[];
+  return users.filter(
+    (u) =>
+      u.role === 'user' &&
+      u.isActive &&
+      u.isAvailableToDonate === true &&
+      u.city?.toLowerCase() === district.toLowerCase(),
+  );
+}

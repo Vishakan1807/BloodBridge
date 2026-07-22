@@ -29,6 +29,7 @@ interface AuthContextValue {
   signUp(email: string, password: string, data: RegisterData): Promise<void>;
   signOut(): Promise<void>;
   resetPassword(email: string): Promise<void>;
+  refreshProfile(): Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -112,6 +113,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await authResetPassword(email);
   }, []);
 
+  // Re-fetches the profile from Firebase — call after availability toggle or donation
+  const refreshProfile = useCallback(async () => {
+    if (!currentUser) return;
+    try {
+      const profile = await getProfile(currentUser.uid);
+      if (profile) setUserProfile(profile);
+    } catch {
+      // Silently fail — profile will refresh on next auth state change
+    }
+  }, [currentUser]);
+
   const value: AuthContextValue = {
     currentUser,
     userProfile,
@@ -120,6 +132,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signUp,
     signOut,
     resetPassword,
+    refreshProfile,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
