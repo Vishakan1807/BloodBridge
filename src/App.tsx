@@ -37,6 +37,7 @@ import { UserManagementPage } from '@/pages/admin/UserManagementPage';
 import { RoleAssignmentPage } from '@/pages/admin/RoleAssignmentPage';
 import { AuditLogPage }      from '@/pages/admin/AuditLogPage';
 import { SystemSettingsPage } from '@/pages/admin/SystemSettingsPage';
+import { ProfileSettingsPage } from '@/features/settings/ProfileSettingsPage';
 import { DonorHistoryPage }    from '@/pages/donor/DonorHistoryPage';
 
 // ── Redirect-if-auth wrapper for public routes ────────────────
@@ -92,6 +93,9 @@ const router = createBrowserRouter([
       { path: 'reports/summary',  element: <RoleGuard allow={['manager', 'admin']}><SummaryReportPage /></RoleGuard> },
       { path: 'reports/status',   element: <RoleGuard allow={['manager', 'admin']}><StatusReportPage /></RoleGuard> },
       { path: 'reports/activity', element: <RoleGuard allow={['manager', 'admin']}><ActivityReportPage /></RoleGuard> },
+
+      // Account Settings (all roles)
+      { path: 'settings', element: <ProfileSettingsPage /> },
 
       // Administration (admin only)
       { path: 'admin/users',    element: <RoleGuard allow={['admin']}><UserManagementPage /></RoleGuard> },

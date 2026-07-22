@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
+import { CompleteProfileModal } from '@/components/auth/CompleteProfileModal';
 
 export function AppShell() {
   const [sidebarOpen,     setSidebarOpen]     = useState(false);
@@ -9,6 +10,8 @@ export function AppShell() {
 
   return (
     <div className="min-h-screen bg-surface-900 flex">
+      {/* Complete Profile Onboarding Modal for Google Sign-In & Incomplete Users */}
+      <CompleteProfileModal />
       {/* ── Sidebar ─────────────────────────────────────── */}
       <Sidebar
         isOpen={sidebarOpen}

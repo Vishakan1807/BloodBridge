@@ -27,6 +27,9 @@ export const ROUTES = {
   REPORTS_STATUS:   '/reports/status',
   REPORTS_ACTIVITY: '/reports/activity',
 
+  // Account & Profile Settings
+  SETTINGS: '/settings',
+
   // Admin
   ADMIN_USERS:    '/admin/users',
   ADMIN_ROLES:    '/admin/roles',

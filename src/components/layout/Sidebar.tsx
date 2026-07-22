@@ -63,13 +63,20 @@ const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
+    title: 'Account',
+    allowedRoles: ['admin', 'manager', 'user'],
+    items: [
+      { label: 'Profile Settings', path: ROUTES.SETTINGS, icon: <Settings size={18} />, allowedRoles: ['admin', 'manager', 'user'] },
+    ],
+  },
+  {
     title: 'System',
     allowedRoles: ['admin'],
     items: [
       { label: 'Users',      path: ROUTES.ADMIN_USERS,    icon: <Users size={18} />,     allowedRoles: ['admin'] },
       { label: 'Roles',      path: ROUTES.ADMIN_ROLES,    icon: <KeyRound size={18} />,  allowedRoles: ['admin'] },
       { label: 'Audit Log',  path: ROUTES.ADMIN_AUDIT,    icon: <ScrollText size={18} />,allowedRoles: ['admin'] },
-      { label: 'Settings',   path: ROUTES.ADMIN_SETTINGS, icon: <Settings size={18} />,  allowedRoles: ['admin'] },
+      { label: 'System Config', path: ROUTES.ADMIN_SETTINGS, icon: <Settings size={18} />,  allowedRoles: ['admin'] },
     ],
   },
 ];

@@ -45,6 +45,18 @@ export async function updateUserProfile(
   });
 }
 
+// ── Delete User Account ───────────────────────────────────────
+export async function deleteUserAccount(uid: string): Promise<void> {
+  const { remove } = await import('firebase/database');
+  const { deleteUser } = await import('firebase/auth');
+  const { auth: fAuth } = await import('@/core/config/firebase');
+
+  await remove(ref(db, `users/${uid}`));
+  if (fAuth.currentUser && fAuth.currentUser.uid === uid) {
+    await deleteUser(fAuth.currentUser);
+  }
+}
+
 // ── List All Users (Admin only) ───────────────────────────────
 export async function listUsers(): Promise<UserProfile[]> {
   const snapshot = await get(ref(db, 'users'));
