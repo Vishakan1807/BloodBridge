@@ -54,7 +54,7 @@ export async function signInWithGoogle(): Promise<{ credential: UserCredential; 
       displayName: credential.user.displayName || 'Donor',
       phone:       credential.user.phoneNumber || '',
       city:        '',
-      bloodGroup:  'O+',
+      bloodGroup:  '', // Left empty so onboarding modal prompts them for their exact blood group
     });
   }
 

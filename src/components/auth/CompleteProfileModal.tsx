@@ -11,31 +11,37 @@ import { updateUserProfile } from '@/services/user.service';
 import { Droplets, ShieldCheck, MapPin, Phone } from 'lucide-react';
 
 export function CompleteProfileModal() {
-  const { userProfile, refreshProfile } = useAuth();
-  const { showSuccess, showError }      = useToast();
+  const { currentUser, userProfile, refreshProfile } = useAuth();
+  const { showSuccess, showError }                  = useToast();
 
-  const [isOpen, setIsOpen]           = useState(false);
-  const [bloodGroup, setBloodGroup]   = useState('');
-  const [district, setDistrict]       = useState('');
-  const [phone, setPhone]             = useState('');
-  const [saving, setSaving]           = useState(false);
+  const [isOpen, setIsOpen]         = useState(false);
+  const [bloodGroup, setBloodGroup] = useState('');
+  const [district, setDistrict]     = useState('');
+  const [phone, setPhone]           = useState('');
+  const [saving, setSaving]         = useState(false);
 
-  // Trigger modal whenever userProfile has missing bloodGroup, city, or phone
+  // Trigger modal ONLY for Google Sign-In users who have missing bloodGroup, city, or phone
   useEffect(() => {
-    if (!userProfile) {
+    if (!userProfile || !currentUser) {
       setIsOpen(false);
       return;
     }
-    const needsCompletion = !userProfile.city || !userProfile.bloodGroup || !userProfile.phone;
+
+    // Check if user authenticated via Google provider!
+    const isGoogleUser = currentUser.providerData.some((p) => p.providerId === 'google.com');
+
+    // ONLY show modal if it is a Google OAuth user AND details are missing!
+    const needsCompletion = isGoogleUser && (!userProfile.city || !userProfile.bloodGroup || !userProfile.phone);
+
     if (needsCompletion) {
-      setBloodGroup(userProfile.bloodGroup || 'O+');
+      setBloodGroup(userProfile.bloodGroup || '');
       setDistrict(userProfile.city || '');
       setPhone(userProfile.phone || '');
       setIsOpen(true);
     } else {
       setIsOpen(false);
     }
-  }, [userProfile]);
+  }, [userProfile, currentUser]);
 
   const bgOptions: SelectOption[] = [
     { value: '', label: 'Select your blood group...' },
