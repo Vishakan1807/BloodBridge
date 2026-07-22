@@ -63,13 +63,6 @@ const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
-    title: 'Account',
-    allowedRoles: ['admin', 'manager', 'user'],
-    items: [
-      { label: 'Profile Settings', path: ROUTES.SETTINGS, icon: <Settings size={18} />, allowedRoles: ['admin', 'manager', 'user'] },
-    ],
-  },
-  {
     title: 'System',
     allowedRoles: ['admin'],
     items: [
@@ -77,6 +70,13 @@ const NAV_SECTIONS: NavSection[] = [
       { label: 'Roles',      path: ROUTES.ADMIN_ROLES,    icon: <KeyRound size={18} />,  allowedRoles: ['admin'] },
       { label: 'Audit Log',  path: ROUTES.ADMIN_AUDIT,    icon: <ScrollText size={18} />,allowedRoles: ['admin'] },
       { label: 'System Config', path: ROUTES.ADMIN_SETTINGS, icon: <Settings size={18} />,  allowedRoles: ['admin'] },
+    ],
+  },
+  {
+    title: 'Account',
+    allowedRoles: ['admin', 'manager', 'user'],
+    items: [
+      { label: 'Profile & Location', path: ROUTES.SETTINGS, icon: <Settings size={18} />, allowedRoles: ['admin', 'manager', 'user'] },
     ],
   },
 ];
@@ -214,25 +214,36 @@ export function Sidebar({ isOpen, isCollapsed, onClose, onToggleCollapse }: Side
             isCollapsed && 'justify-center flex-col',
           ].filter(Boolean).join(' ')}>
             {/* Avatar */}
-            <div className="w-8 h-8 rounded-full bg-brand-500/20 border border-brand-500/30
-                            flex items-center justify-center text-brand-400 font-semibold text-xs shrink-0">
+            <NavLink to={ROUTES.SETTINGS} title="Account & Location Settings" className="w-8 h-8 rounded-full bg-brand-500/20 border border-brand-500/30 flex items-center justify-center text-brand-400 font-semibold text-xs shrink-0 hover:border-brand-400 transition-colors">
               {initials}
-            </div>
+            </NavLink>
             {!isCollapsed && (
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-slate-200 truncate">{displayName}</p>
+                <NavLink to={ROUTES.SETTINGS} className="hover:underline">
+                  <p className="text-sm font-medium text-slate-200 truncate">{displayName}</p>
+                </NavLink>
                 <p className="text-xs text-muted">{roleLabel}</p>
               </div>
             )}
             {!isCollapsed && (
-              <button
-                onClick={() => setShowConfirmLogout(true)}
-                className="text-muted hover:text-danger transition-colors p-1 rounded-md hover:bg-surface-700 cursor-pointer"
-                aria-label="Sign out"
-                title="Sign out"
-              >
-                <LogOut size={16} />
-              </button>
+              <div className="flex items-center gap-1">
+                <NavLink
+                  to={ROUTES.SETTINGS}
+                  className="text-muted hover:text-white transition-colors p-1 rounded-md hover:bg-surface-700 cursor-pointer"
+                  aria-label="Account Settings"
+                  title="Account & Location Settings"
+                >
+                  <Settings size={16} />
+                </NavLink>
+                <button
+                  onClick={() => setShowConfirmLogout(true)}
+                  className="text-muted hover:text-danger transition-colors p-1 rounded-md hover:bg-surface-700 cursor-pointer"
+                  aria-label="Sign out"
+                  title="Sign out"
+                >
+                  <LogOut size={16} />
+                </button>
+              </div>
             )}
           </div>
 
@@ -302,21 +313,31 @@ export function Sidebar({ isOpen, isCollapsed, onClose, onToggleCollapse }: Side
         {/* User */}
         <div className="border-t border-surface-700 p-4">
           <div className="flex items-center gap-3 mb-3">
-            <div className="w-9 h-9 rounded-full bg-brand-500/20 border border-brand-500/30
-                            flex items-center justify-center text-brand-400 font-semibold text-sm">
+            <NavLink to={ROUTES.SETTINGS} onClick={onClose} className="w-9 h-9 rounded-full bg-brand-500/20 border border-brand-500/30 flex items-center justify-center text-brand-400 font-semibold text-sm shrink-0">
               {initials}
-            </div>
-            <div>
-              <p className="text-sm font-medium text-slate-200">{displayName}</p>
+            </NavLink>
+            <div className="flex-1 min-w-0">
+              <NavLink to={ROUTES.SETTINGS} onClick={onClose} className="hover:underline">
+                <p className="text-sm font-medium text-slate-200 truncate">{displayName}</p>
+              </NavLink>
               <p className="text-xs text-muted">{roleLabel}</p>
             </div>
           </div>
-          <button
-            onClick={() => setShowConfirmLogout(true)}
-            className="flex items-center gap-2 text-sm text-muted hover:text-danger transition-colors cursor-pointer"
-          >
-            <LogOut size={14} /> Sign out
-          </button>
+          <div className="flex items-center justify-between pt-2 border-t border-surface-700/60">
+            <NavLink
+              to={ROUTES.SETTINGS}
+              onClick={onClose}
+              className="flex items-center gap-2 text-sm text-slate-300 hover:text-white transition-colors cursor-pointer"
+            >
+              <Settings size={14} /> Profile & Settings
+            </NavLink>
+            <button
+              onClick={() => setShowConfirmLogout(true)}
+              className="flex items-center gap-1.5 text-sm text-muted hover:text-danger transition-colors cursor-pointer"
+            >
+              <LogOut size={14} /> Sign out
+            </button>
+          </div>
         </div>
       </aside>
 
