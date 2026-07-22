@@ -46,31 +46,6 @@ const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
-    title: 'Settings',
-    allowedRoles: ['admin', 'manager', 'user'],
-    items: [
-      { label: 'Profile & Location', path: ROUTES.SETTINGS,       icon: <Settings size={18} />,      allowedRoles: ['admin', 'manager', 'user'] },
-    ],
-  },
-  {
-    title: 'Master Data',
-    allowedRoles: ['admin'],
-    items: [
-      { label: 'Blood Groups', path: ROUTES.MASTER_BLOOD_GROUPS, icon: <Droplet size={18} />,    allowedRoles: ['admin'] },
-      { label: 'Camps',        path: ROUTES.MASTER_CAMPS,        icon: <Building2 size={18} />,  allowedRoles: ['admin'] },
-      { label: 'Hospitals',    path: ROUTES.MASTER_HOSPITALS,    icon: <Hospital size={18} />,   allowedRoles: ['admin'] },
-    ],
-  },
-  {
-    title: 'Insights',
-    allowedRoles: ['admin', 'manager'],
-    items: [
-      { label: 'Summary Report',  path: ROUTES.REPORTS_SUMMARY,  icon: <BarChart3 size={18} />, allowedRoles: ['admin', 'manager'] },
-      { label: 'Status Report',   path: ROUTES.REPORTS_STATUS,   icon: <PieChart size={18} />,  allowedRoles: ['admin', 'manager'] },
-      { label: 'Activity Report', path: ROUTES.REPORTS_ACTIVITY, icon: <Activity size={18} />,  allowedRoles: ['admin', 'manager'] },
-    ],
-  },
-  {
     title: 'System',
     allowedRoles: ['admin'],
     items: [
@@ -78,6 +53,13 @@ const NAV_SECTIONS: NavSection[] = [
       { label: 'Roles',      path: ROUTES.ADMIN_ROLES,    icon: <KeyRound size={18} />,  allowedRoles: ['admin'] },
       { label: 'Audit Log',  path: ROUTES.ADMIN_AUDIT,    icon: <ScrollText size={18} />,allowedRoles: ['admin'] },
       { label: 'System Config', path: ROUTES.ADMIN_SETTINGS, icon: <Settings size={18} />,  allowedRoles: ['admin'] },
+    ],
+  },
+  {
+    title: 'Settings',
+    allowedRoles: ['admin', 'manager', 'user'],
+    items: [
+      { label: 'Profile & Location', path: ROUTES.SETTINGS,       icon: <Settings size={18} />,      allowedRoles: ['admin', 'manager', 'user'] },
     ],
   },
 ];
