@@ -19,9 +19,9 @@ const THEME_CONFIGS: ThemeConfig[] = [
     id: 'dark',
     name: 'Crimson Dark',
     tagline: 'Deep Midnight & Crimson Red',
-    icon: <Moon size={15} className="text-rose-400" />,
-    accentBg: 'bg-gradient-to-r from-rose-950/90 via-brand-900/80 to-surface-900',
-    hoverBg: 'hover:bg-rose-950/50 hover:border-rose-500/50 hover:shadow-rose-500/15',
+    icon: <Moon size={16} className="text-rose-400 shrink-0" />,
+    accentBg: 'bg-[#1a0a12] border-rose-500/70 shadow-md shadow-rose-500/10',
+    hoverBg: 'bg-[#12070c] border-rose-900/60 hover:bg-[#1f0c16] hover:border-rose-500/50',
     glowColor: 'shadow-rose-500/25 ring-rose-500/40',
     badgeBorder: 'border-rose-500/40',
     dotColor: 'bg-rose-500',
@@ -30,9 +30,9 @@ const THEME_CONFIGS: ThemeConfig[] = [
     id: 'light',
     name: 'Executive Light',
     tagline: 'Clean High-Contrast Clinical',
-    icon: <Sun size={15} className="text-amber-400" />,
-    accentBg: 'bg-gradient-to-r from-amber-950/90 via-slate-800/80 to-surface-900',
-    hoverBg: 'hover:bg-amber-950/50 hover:border-amber-400/50 hover:shadow-amber-500/15',
+    icon: <Sun size={16} className="text-amber-400 shrink-0" />,
+    accentBg: 'bg-[#1e293b] border-amber-400/70 shadow-md shadow-amber-400/10',
+    hoverBg: 'bg-[#0f172a] border-slate-700/60 hover:bg-[#1e293b] hover:border-amber-400/50',
     glowColor: 'shadow-amber-500/25 ring-amber-500/40',
     badgeBorder: 'border-amber-400/40',
     dotColor: 'bg-amber-400',
@@ -41,9 +41,9 @@ const THEME_CONFIGS: ThemeConfig[] = [
     id: 'emerald',
     name: 'Emerald Health',
     tagline: 'Vibrant Clinical Green',
-    icon: <Activity size={15} className="text-emerald-400" />,
-    accentBg: 'bg-gradient-to-r from-emerald-950/90 via-teal-900/80 to-surface-900',
-    hoverBg: 'hover:bg-emerald-950/50 hover:border-emerald-400/50 hover:shadow-emerald-500/15',
+    icon: <Activity size={16} className="text-emerald-400 shrink-0" />,
+    accentBg: 'bg-[#04211a] border-emerald-400/70 shadow-md shadow-emerald-400/10',
+    hoverBg: 'bg-[#02130f] border-emerald-950/60 hover:bg-[#062d23] hover:border-emerald-400/50',
     glowColor: 'shadow-emerald-500/25 ring-emerald-500/40',
     badgeBorder: 'border-emerald-400/40',
     dotColor: 'bg-emerald-400',
@@ -77,8 +77,8 @@ export function ThemeToggle({ className = '' }: { className?: string }) {
         aria-expanded={isOpen}
         className={`
           group relative flex items-center gap-2 px-3.5 py-1.5 rounded-full
-          bg-surface-900/90 border ${currentConfig.badgeBorder}
-          shadow-lg ${currentConfig.glowColor} backdrop-blur-xl
+          bg-surface-900 border ${currentConfig.badgeBorder}
+          shadow-lg ${currentConfig.glowColor}
           hover:scale-[1.04] hover:shadow-xl active:scale-[0.98]
           transition-all duration-300 cursor-pointer select-none
         `}
@@ -107,14 +107,14 @@ export function ThemeToggle({ className = '' }: { className?: string }) {
         </div>
       </button>
 
-      {/* ── Fancy Glassmorphic Popover Palette Menu ────────────────── */}
+      {/* ── 100% Solid Opaque Popover Palette Menu ────────────────── */}
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-64 p-2 z-[9999] bg-surface-900 border border-surface-600 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.9)] backdrop-blur-2xl animate-in fade-in zoom-in-95 duration-200 space-y-1.5">
-          <div className="px-3 py-1.5 flex items-center justify-between border-b border-surface-700/60 mb-1">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-muted flex items-center gap-1">
-              <Sparkles size={10} className="text-brand-400" /> Select Theme Mode
+        <div className="absolute right-0 mt-2.5 w-72 p-2.5 z-[99999] bg-surface-950 border-2 border-surface-600 rounded-2xl shadow-[0_30px_70px_rgba(0,0,0,0.98)] opacity-100 space-y-2 select-none">
+          <div className="px-3 py-1.5 flex items-center justify-between border-b border-surface-700 mb-1">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+              <Sparkles size={12} className="text-brand-400" /> Select Theme Mode
             </span>
-            <span className="text-[10px] text-brand-400 font-mono font-semibold">BloodBridge</span>
+            <span className="text-[10px] text-brand-400 font-mono font-bold">BloodBridge</span>
           </div>
 
           {THEME_CONFIGS.map((t) => {
@@ -127,19 +127,19 @@ export function ThemeToggle({ className = '' }: { className?: string }) {
                   setIsOpen(false);
                 }}
                 className={`
-                  group w-full flex items-center justify-between p-2.5 rounded-xl text-left
+                  group w-full flex items-center justify-between p-3 rounded-xl text-left
                   transition-all duration-200 cursor-pointer border shadow-sm
                   hover:scale-[1.02] hover:shadow-lg active:scale-[0.98]
                   ${isActive
-                    ? `${t.accentBg} ${t.badgeBorder} shadow-md`
-                    : `bg-surface-800 border-surface-700 ${t.hoverBg}`
+                    ? `${t.accentBg} shadow-md`
+                    : `${t.hoverBg}`
                   }
                 `}
               >
                 <div className="flex items-center gap-3">
                   <div className={`
-                    p-2 rounded-lg bg-surface-800/90 border ${t.badgeBorder} shrink-0
-                    group-hover:scale-110 group-hover:rotate-6 group-hover:bg-surface-700/80
+                    p-2.5 rounded-lg bg-surface-900 border ${t.badgeBorder} shrink-0
+                    group-hover:scale-110 group-hover:rotate-6
                     transition-all duration-200
                   `}>
                     {t.icon}
@@ -153,7 +153,7 @@ export function ThemeToggle({ className = '' }: { className?: string }) {
                         <span className={`w-1.5 h-1.5 rounded-full ${t.dotColor} animate-ping`} />
                       )}
                     </div>
-                    <p className="text-[10px] text-muted group-hover:text-slate-300 transition-colors tracking-tight mt-0.5">
+                    <p className="text-[10px] text-slate-400 group-hover:text-slate-200 transition-colors tracking-tight mt-0.5">
                       {t.tagline}
                     </p>
                   </div>
