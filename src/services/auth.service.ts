@@ -1,12 +1,17 @@
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  signInWithPopup,
+  GoogleAuthProvider,
   signOut as firebaseSignOut,
   sendPasswordResetEmail,
   updateProfile,
   type UserCredential,
 } from 'firebase/auth';
 import { auth } from '@/core/config/firebase';
+import { getProfile, createProfile } from '@/services/user.service';
+
+const googleProvider = new GoogleAuthProvider();
 
 // ── Sign In ───────────────────────────────────────────────────
 export async function signIn(
@@ -35,4 +40,23 @@ export async function signOut(): Promise<void> {
 // ── Password Reset ────────────────────────────────────────────
 export async function resetPassword(email: string): Promise<void> {
   return sendPasswordResetEmail(auth, email);
+}
+
+// ── Google Sign In ────────────────────────────────────────────
+export async function signInWithGoogle(): Promise<{ credential: UserCredential; isNewUser: boolean }> {
+  const credential = await signInWithPopup(auth, googleProvider);
+  const existingProfile = await getProfile(credential.user.uid);
+
+  let isNewUser = false;
+  if (!existingProfile) {
+    isNewUser = true;
+    await createProfile(credential.user.uid, credential.user.email || '', {
+      displayName: credential.user.displayName || 'Donor',
+      phone:       credential.user.phoneNumber || '',
+      city:        '',
+      bloodGroup:  'O+',
+    });
+  }
+
+  return { credential, isNewUser };
 }

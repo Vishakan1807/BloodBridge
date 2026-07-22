@@ -13,6 +13,7 @@ import {
   signUp as authSignUp,
   signOut as authSignOut,
   resetPassword as authResetPassword,
+  signInWithGoogle as authSignInWithGoogle,
 } from '@/services/auth.service';
 import {
   createProfile,
@@ -27,6 +28,7 @@ interface AuthContextValue {
   loading:      boolean;
   signIn(email: string, password: string): Promise<void>;
   signUp(email: string, password: string, data: RegisterData): Promise<void>;
+  signInWithGoogle(): Promise<{ isNewUser: boolean }>;
   signOut(): Promise<void>;
   resetPassword(email: string): Promise<void>;
   refreshProfile(): Promise<void>;
@@ -113,6 +115,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await authResetPassword(email);
   }, []);
 
+  const signInWithGoogle = useCallback(async () => {
+    const { credential, isNewUser } = await authSignInWithGoogle();
+    if (credential.user) {
+      const profile = await getProfile(credential.user.uid);
+      if (profile) setUserProfile(profile);
+    }
+    return { isNewUser };
+  }, []);
+
   // Re-fetches the profile from Firebase — call after availability toggle or donation
   const refreshProfile = useCallback(async () => {
     if (!currentUser) return;
@@ -132,6 +143,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signUp,
     signOut,
     resetPassword,
+    signInWithGoogle,
     refreshProfile,
   };
 
