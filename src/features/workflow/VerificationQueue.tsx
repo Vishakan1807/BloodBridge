@@ -67,7 +67,7 @@ export function VerificationQueue() {
             <ShieldCheck className="text-info" /> Donor Verification Queue
           </h1>
           <p className="text-muted text-sm mt-1">
-            Review incoming requests and broadcast to blood banks in the donor's city
+            Review incoming requests and broadcast to blood banks in the donor's district
           </p>
         </div>
         <div className="bg-info-dim/40 border border-info/30 rounded-xl px-4 py-2 text-right">
@@ -98,7 +98,7 @@ export function VerificationQueue() {
                   <th className="py-3 px-6">Requester</th>
                   <th className="py-3 px-6">Patient</th>
                   <th className="py-3 px-6">Blood Needed</th>
-                  <th className="py-3 px-6">City</th>
+                  <th className="py-3 px-6">District</th>
                   <th className="py-3 px-6">Hospital</th>
                   <th className="py-3 px-6 text-right">Action</th>
                 </tr>

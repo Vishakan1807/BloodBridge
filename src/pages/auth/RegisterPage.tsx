@@ -120,7 +120,7 @@ export default function RegisterPage() {
     else if (!/^(\+91)?[6-9]\d{9}$/.test(form.phone.replace(/\s/g, '')))
       errs.phone = 'Enter a valid Indian mobile number.';
 
-    if (!form.city.trim())                        errs.city = 'City is required.';
+    if (!form.city.trim())                        errs.city = 'District is required.';
     if (!form.bloodGroup)                         errs.bloodGroup = 'Please select your blood group.';
 
     setErrors(errs);
@@ -242,9 +242,9 @@ export default function RegisterPage() {
             <div className="grid grid-cols-2 gap-4">
               <Select
                 id="reg-city"
-                label="City"
+                label="District (Tamil Nadu)"
                 options={[
-                  { value: '', label: 'Select your city...' },
+                  { value: '', label: 'Select your Tamil Nadu district...' },
                   ...cityOptions,
                 ]}
                 value={form.city}

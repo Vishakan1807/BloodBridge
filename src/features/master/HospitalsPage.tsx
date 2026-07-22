@@ -4,8 +4,10 @@ import { useAuth } from '@/core/context/AuthContext';
 import { useToast } from '@/core/context/ToastContext';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { Select } from '@/components/ui/Select';
 import { Modal, ConfirmDialog } from '@/components/ui/Modal';
 import { Card } from '@/components/ui/Card';
+import { CITY_OPTIONS } from '@/core/constants/indianCities';
 import {
   subscribeHospitals,
   createHospital,
@@ -62,7 +64,7 @@ export function HospitalsPage() {
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim() || !city.trim()) {
-      showError('Hospital name and city are required.');
+      showError('Hospital name and district are required.');
       return;
     }
 
@@ -235,16 +237,19 @@ export function HospitalsPage() {
           />
 
           <div className="grid grid-cols-2 gap-4">
-            <Input
-              label="City"
-              placeholder="e.g. Mumbai"
+            <Select
+              label="District (Tamil Nadu)"
+              options={[
+                { value: '', label: 'Select District...' },
+                ...CITY_OPTIONS,
+              ]}
               value={city}
               onChange={(e) => setCity(e.target.value)}
               required
             />
             <Input
               label="Phone"
-              placeholder="e.g. +91-22-26751000"
+              placeholder="e.g. +91-44-28290000"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
             />

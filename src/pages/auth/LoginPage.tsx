@@ -22,7 +22,7 @@ function parseFirebaseError(code: string): string {
 
 // ── Highlights for the hero panel ──────────────────────────────
 const HERO_STATS = [
-  { value: 'Real-Time',  label: 'City Broadcast Network' },
+  { value: 'Real-Time',  label: 'Tamil Nadu District Network' },
   { value: 'First-Come', label: 'FCFS Smart Allocation' },
   { value: 'Instant',    label: 'Email & SMS Alerts' },
 ];

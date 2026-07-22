@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/Input';
 import { Select, type SelectOption } from '@/components/ui/Select';
 import { Modal, ConfirmDialog } from '@/components/ui/Modal';
 import { Card } from '@/components/ui/Card';
+import { CITY_OPTIONS } from '@/core/constants/indianCities';
 import {
   subscribeCamps,
   createCamp,
@@ -74,7 +75,7 @@ export function CampsPage() {
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim() || !city.trim()) {
-      showError('Camp name and city are required.');
+      showError('Camp name and district are required.');
       return;
     }
 
@@ -181,7 +182,7 @@ export function CampsPage() {
       <Card padding="md">
         <div className="w-full sm:w-72">
           <Input
-            placeholder="Search camps by name or city..."
+            placeholder="Search camps by name or district..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             icon={<Search size={16} />}
@@ -286,16 +287,19 @@ export function CampsPage() {
           />
 
           <div className="grid grid-cols-2 gap-4">
-            <Input
-              label="City"
-              placeholder="e.g. Mumbai"
+            <Select
+              label="District (Tamil Nadu)"
+              options={[
+                { value: '', label: 'Select District...' },
+                ...CITY_OPTIONS,
+              ]}
               value={city}
               onChange={(e) => setCity(e.target.value)}
               required
             />
             <Input
               label="Phone"
-              placeholder="e.g. +91-22-26734567"
+              placeholder="e.g. +91-44-28340000"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
             />
