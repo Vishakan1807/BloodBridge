@@ -52,11 +52,8 @@ function buildBreadcrumbs(pathname: string): { label: string; path: string }[] {
 }
 
 export function Header({ onMenuClick }: HeaderProps) {
-  const { userProfile } = useAuth();
-  const location        = useLocation();
-  const breadcrumbs     = buildBreadcrumbs(location.pathname);
-
-  const isDonorOrManager = userProfile?.role === 'user' || userProfile?.role === 'manager';
+  const location   = useLocation();
+  const breadcrumbs = buildBreadcrumbs(location.pathname);
 
   return (
     <header className="sticky top-0 z-20 bg-surface-800/80 backdrop-blur-md border-b border-surface-700 px-6 py-4 flex items-center justify-between">
@@ -94,24 +91,10 @@ export function Header({ onMenuClick }: HeaderProps) {
         </nav>
       </div>
 
-      {/* Right Controls: Notifications, Theme Toggle & Top Right Settings */}
+      {/* Right Controls: Notifications & Theme Toggle */}
       <div className="flex items-center gap-3">
         <NotificationCenter />
-
-        {/* Theme Toggle pushed towards center */}
         <ThemeToggle />
-
-        {/* Settings button on top right for Donor and Manager accounts */}
-        {isDonorOrManager && (
-          <Link
-            to={ROUTES.SETTINGS}
-            title="Profile & Location Settings"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-surface-900/90 border border-surface-600/70 text-xs font-semibold text-slate-200 hover:text-white hover:border-brand-500/50 hover:bg-surface-700/80 transition-all cursor-pointer shadow-md backdrop-blur-md"
-          >
-            <Settings size={14} className="text-brand-400" />
-            <span className="hidden sm:inline">Settings</span>
-          </Link>
-        )}
       </div>
     </header>
   );

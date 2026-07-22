@@ -37,11 +37,13 @@ const NAV_SECTIONS: NavSection[] = [
   },
   {
     title: 'Manage',
-    allowedRoles: ['admin', 'manager'],
+    allowedRoles: ['admin', 'manager', 'user'],
     items: [
-      { label: 'Donation Requests', path: ROUTES.REQUESTS,        icon: <ClipboardList size={18} />, allowedRoles: ['admin', 'manager', 'user'] },
+      { label: 'Donation Requests', path: ROUTES.REQUESTS,        icon: <ClipboardList size={18} />, allowedRoles: ['admin', 'manager'] },
+      { label: 'My Requests',       path: ROUTES.REQUESTS,        icon: <ClipboardList size={18} />, allowedRoles: ['user'] },
       { label: 'Verify Donors',     path: ROUTES.WORKFLOW_VERIFY, icon: <ShieldCheck size={18} />,  allowedRoles: ['admin', 'manager'] },
       { label: 'Match Donors',      path: ROUTES.WORKFLOW_MATCH,  icon: <Target size={18} />,        allowedRoles: ['admin', 'manager'] },
+      { label: 'Profile & Location', path: ROUTES.SETTINGS,       icon: <Settings size={18} />,      allowedRoles: ['admin', 'manager', 'user'] },
     ],
   },
   {
@@ -72,19 +74,7 @@ const NAV_SECTIONS: NavSection[] = [
       { label: 'System Config', path: ROUTES.ADMIN_SETTINGS, icon: <Settings size={18} />,  allowedRoles: ['admin'] },
     ],
   },
-  {
-    title: 'Account',
-    allowedRoles: ['admin', 'manager', 'user'],
-    items: [
-      { label: 'Profile & Location', path: ROUTES.SETTINGS, icon: <Settings size={18} />, allowedRoles: ['admin', 'manager', 'user'] },
-    ],
-  },
 ];
-
-// ── Requests entry visible to users too ──────────────────────
-const USER_REQUESTS: NavItem = {
-  label: 'My Requests', path: ROUTES.REQUESTS, icon: <ClipboardList size={18} />, allowedRoles: ['user'],
-};
 
 interface SidebarProps {
   isOpen:           boolean;
@@ -183,28 +173,6 @@ export function Sidebar({ isOpen, isCollapsed, onClose, onToggleCollapse }: Side
               </div>
             );
           })}
-
-          {/* User: My Requests shortcut */}
-          {role === 'user' && (
-            <div className="mb-4">
-              {!isCollapsed && (
-                <p className="px-3 mb-1 text-xs font-semibold text-muted uppercase tracking-widest">Manage</p>
-              )}
-              <NavLink
-                to={USER_REQUESTS.path}
-                className={({ isActive }) => [
-                  'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm',
-                  'transition-all duration-150 mb-0.5 relative',
-                  isActive
-                    ? 'bg-brand-500/10 text-brand-400 font-medium before:absolute before:left-0 before:top-1 before:bottom-1 before:w-0.5 before:bg-brand-500 before:rounded-full'
-                    : 'text-slate-400 hover:bg-surface-700 hover:text-slate-200',
-                ].join(' ')}
-              >
-                <ClipboardList size={18} />
-                {!isCollapsed && <span>My Requests</span>}
-              </NavLink>
-            </div>
-          )}
         </nav>
 
         {/* User Card */}
