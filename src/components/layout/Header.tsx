@@ -1,8 +1,10 @@
 import React from 'react';
 import { useLocation, Link } from 'react-router-dom';
-import { Menu } from 'lucide-react';
+import { useAuth } from '@/core/context/AuthContext';
+import { Settings, Menu } from 'lucide-react';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { NotificationCenter } from '@/components/layout/NotificationCenter';
+import { ROUTES } from '@/core/constants/routes';
 
 interface HeaderProps {
   onMenuClick: () => void;
@@ -50,8 +52,11 @@ function buildBreadcrumbs(pathname: string): { label: string; path: string }[] {
 }
 
 export function Header({ onMenuClick }: HeaderProps) {
-  const location   = useLocation();
-  const breadcrumbs = buildBreadcrumbs(location.pathname);
+  const { userProfile } = useAuth();
+  const location        = useLocation();
+  const breadcrumbs     = buildBreadcrumbs(location.pathname);
+
+  const isDonorOrManager = userProfile?.role === 'user' || userProfile?.role === 'manager';
 
   return (
     <header className="sticky top-0 z-20 bg-surface-800/80 backdrop-blur-md border-b border-surface-700 px-6 py-4 flex items-center justify-between">
@@ -89,10 +94,24 @@ export function Header({ onMenuClick }: HeaderProps) {
         </nav>
       </div>
 
-      {/* Right Controls: Notifications & Theme Toggle */}
+      {/* Right Controls: Notifications, Theme Toggle & Top Right Settings */}
       <div className="flex items-center gap-3">
         <NotificationCenter />
+
+        {/* Theme Toggle pushed towards center */}
         <ThemeToggle />
+
+        {/* Settings button on top right for Donor and Manager accounts */}
+        {isDonorOrManager && (
+          <Link
+            to={ROUTES.SETTINGS}
+            title="Profile & Location Settings"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-surface-900/90 border border-surface-600/70 text-xs font-semibold text-slate-200 hover:text-white hover:border-brand-500/50 hover:bg-surface-700/80 transition-all cursor-pointer shadow-md backdrop-blur-md"
+          >
+            <Settings size={14} className="text-brand-400" />
+            <span className="hidden sm:inline">Settings</span>
+          </Link>
+        )}
       </div>
     </header>
   );
