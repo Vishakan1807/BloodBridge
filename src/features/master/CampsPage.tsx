@@ -26,6 +26,7 @@ export function CampsPage() {
   const [coordinators, setCoordinators] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [filterDistrict, setFilterDistrict] = useState('');
 
   // Modal State
   const [modalOpen, setModalOpen] = useState(false);
@@ -157,15 +158,24 @@ export function CampsPage() {
   ];
 
   const filteredCamps = useMemo(() => {
+    let result = camps;
+
+    if (filterDistrict) {
+      result = result.filter((c) => c.city === filterDistrict);
+    }
+
     const q = search.toLowerCase().trim();
-    if (!q) return camps;
-    return camps.filter(
-      (c) =>
-        c.name.toLowerCase().includes(q) ||
-        c.city.toLowerCase().includes(q) ||
-        (c.address && c.address.toLowerCase().includes(q)),
-    );
-  }, [camps, search]);
+    if (q) {
+      result = result.filter(
+        (c) =>
+          c.name.toLowerCase().includes(q) ||
+          c.city.toLowerCase().includes(q) ||
+          (c.address && c.address.toLowerCase().includes(q)),
+      );
+    }
+
+    return result;
+  }, [camps, search, filterDistrict]);
 
   return (
     <div className="space-y-6 page-enter">
@@ -194,15 +204,24 @@ export function CampsPage() {
         </div>
       </div>
 
-      {/* Search Bar */}
+      {/* Search & Filter Bar */}
       <Card padding="md">
-        <div className="w-full sm:w-72">
-          <Input
-            placeholder="Search camps by name or district..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            icon={<Search size={16} />}
-          />
+        <div className="flex flex-col sm:flex-row gap-4">
+          <div className="w-full sm:w-72">
+            <Input
+              placeholder="Search camps by name or district..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              icon={<Search size={16} />}
+            />
+          </div>
+          <div className="w-full sm:w-64 shrink-0">
+            <Select
+              options={[{ value: '', label: 'All Districts' }, ...CITY_OPTIONS]}
+              value={filterDistrict}
+              onChange={(e) => setFilterDistrict(e.target.value)}
+            />
+          </div>
         </div>
       </Card>
 
