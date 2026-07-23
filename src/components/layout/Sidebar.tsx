@@ -43,6 +43,8 @@ const NAV_SECTIONS: NavSection[] = [
       { label: 'My Requests',       path: ROUTES.REQUESTS,        icon: <ClipboardList size={18} />, allowedRoles: ['user'] },
       { label: 'Verify Donors',     path: ROUTES.WORKFLOW_VERIFY, icon: <ShieldCheck size={18} />,  allowedRoles: ['admin', 'manager'] },
       { label: 'Match Donors',      path: ROUTES.WORKFLOW_MATCH,  icon: <Target size={18} />,        allowedRoles: ['admin', 'manager'] },
+      { label: 'Hospitals',         path: ROUTES.MASTER_HOSPITALS, icon: <Hospital size={18} />,    allowedRoles: ['admin', 'manager'] },
+      { label: 'Blood Camps & Banks', path: ROUTES.MASTER_CAMPS,  icon: <Building2 size={18} />,    allowedRoles: ['admin', 'manager'] },
     ],
   },
   {

@@ -37,7 +37,7 @@ export function ActivityReport() {
           </p>
         </div>
 
-        <Button variant="secondary" icon={<Download size={16} />} onClick={handleExportCSV}>
+        <Button variant="outline" icon={<Download size={16} className="text-emerald-400" />} onClick={handleExportCSV}>
           Export CSV
         </Button>
       </div>

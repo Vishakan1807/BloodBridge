@@ -135,7 +135,7 @@ export function HospitalsPage() {
         <div className="flex flex-wrap items-center gap-3">
           <Button
             variant="outline"
-            icon={<FileSpreadsheet size={18} className="text-brand-400" />}
+            icon={<FileSpreadsheet size={18} className="text-emerald-400" />}
             onClick={() => setBulkModalOpen(true)}
           >
             Bulk Import (Excel / CSV)
