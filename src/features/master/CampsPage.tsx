@@ -358,6 +358,7 @@ export function CampsPage() {
       />
       {/* Bulk Upload Modal */}
       <BulkUploadModal
+        key={bulkModalOpen ? 'camp-modal-open' : 'camp-modal-closed'}
         isOpen={bulkModalOpen}
         onClose={() => setBulkModalOpen(false)}
         entityType="camp"

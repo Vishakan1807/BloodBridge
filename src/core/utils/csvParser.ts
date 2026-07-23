@@ -11,13 +11,13 @@ export interface ParsedHospitalImportRow {
 }
 
 // ── Normalize District String to Tamil Nadu 38 Districts ─────
-export function normalizeDistrict(rawDistrict: string): { district: string; isExact: boolean } {
-  if (!rawDistrict || !rawDistrict.trim()) {
+export function normalizeDistrict(rawDistrict: any): { district: string; isExact: boolean } {
+  const str = String(rawDistrict ?? '').trim();
+  if (!str) {
     return { district: '', isExact: false };
   }
 
-  const trimmed = rawDistrict.trim();
-  const clean = trimmed
+  const clean = str
     .toLowerCase()
     .replace(/\s+(district|dt|dist)\b/g, '')
     .replace(/[^a-z0-9]/g, '');
@@ -68,35 +68,42 @@ export function normalizeDistrict(rawDistrict: string): { district: string; isEx
     }
   }
 
-  return { district: trimmed, isExact: false };
+  return { district: str, isExact: false };
 }
 
 // ── Universal Spreadsheet & CSV Parser using XLSX ─────────────
 export async function parseSpreadsheetFile(file: File): Promise<ParsedHospitalImportRow[]> {
-  const data = await file.arrayBuffer();
-  const workbook = XLSX.read(data, { type: 'array' });
+  try {
+    const data = await file.arrayBuffer();
+    const workbook = XLSX.read(data, { type: 'array' });
 
-  const firstSheetName = workbook.SheetNames[0];
-  if (!firstSheetName) return [];
+    const firstSheetName = workbook.SheetNames[0];
+    if (!firstSheetName) return [];
 
-  const worksheet = workbook.Sheets[firstSheetName];
-  // Parse into 2D string matrix
-  const matrix = XLSX.utils.sheet_to_json<string[]>(worksheet, { header: 1, raw: false, defval: '' });
+    const worksheet = workbook.Sheets[firstSheetName];
+    // Parse into 2D string matrix
+    const matrix = XLSX.utils.sheet_to_json<any[]>(worksheet, { header: 1, raw: false, defval: '' });
 
-  const cleanMatrix: string[][] = matrix
-    .map((row) => (Array.isArray(row) ? row.map((cell) => String(cell || '').trim()) : []))
-    .filter((row) => row.some((cell) => cell.length > 0));
+    if (!matrix || matrix.length === 0) return [];
 
-  if (cleanMatrix.length === 0) return [];
+    const cleanMatrix: string[][] = matrix
+      .map((row) => (Array.isArray(row) ? row.map((cell) => String(cell ?? '').trim()) : []))
+      .filter((row) => row.some((cell) => cell.length > 0));
 
-  return processMatrixToHospitalRows(cleanMatrix);
+    if (cleanMatrix.length === 0) return [];
+
+    return processMatrixToHospitalRows(cleanMatrix);
+  } catch (err: any) {
+    console.error('Failed to parse spreadsheet file:', err);
+    throw new Error('Spreadsheet read error: ' + (err?.message || String(err)));
+  }
 }
 
 export function processMatrixToHospitalRows(rawRows: string[][]): ParsedHospitalImportRow[] {
   if (rawRows.length === 0) return [];
 
   // Determine if Row 0 is Header
-  const firstRowLower = rawRows[0].map((c) => c.toLowerCase());
+  const firstRowLower = rawRows[0].map((c) => String(c ?? '').toLowerCase().trim());
   const hasHeaderKeywords = firstRowLower.some((h) =>
     ['hospital', 'camp', 'name', 'district', 'city', 'location', 'address', 'phone', 'contact'].some((kw) =>
       h.includes(kw),
@@ -143,10 +150,10 @@ export function processMatrixToHospitalRows(rawRows: string[][]): ParsedHospital
   if (phoneIdx === -1) phoneIdx = 3;
 
   return dataRows.map((row) => {
-    const rawName = row[nameIdx] || '';
-    const rawDist = row[districtIdx] || '';
-    const rawAddr = row[addressIdx] || '';
-    const rawPhone = row[phoneIdx] || '';
+    const rawName = String(row[nameIdx] ?? '');
+    const rawDist = String(row[districtIdx] ?? '');
+    const rawAddr = String(row[addressIdx] ?? '');
+    const rawPhone = String(row[phoneIdx] ?? '');
 
     const name = rawName.trim();
     const address = rawAddr.trim();

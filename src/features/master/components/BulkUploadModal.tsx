@@ -61,7 +61,7 @@ export function BulkUploadModal({
     setParsing(true);
     try {
       const rows = await parseSpreadsheetFile(file);
-      if (rows.length === 0) {
+      if (!rows || rows.length === 0) {
         showError('No valid data rows found in the uploaded file. Please verify columns.');
         setParsedRows([]);
         return;
@@ -88,6 +88,7 @@ export function BulkUploadModal({
 
   function handleDrop(e: React.DragEvent<HTMLDivElement>) {
     e.preventDefault();
+    e.stopPropagation();
     setIsDragging(false);
     const file = e.dataTransfer.files?.[0];
     if (file) {
@@ -200,12 +201,20 @@ export function BulkUploadModal({
 
         {/* Upload File Zone */}
         <div
-          onClick={() => fileInputRef.current?.click()}
+          onClick={(e) => {
+            e.stopPropagation();
+            fileInputRef.current?.click();
+          }}
           onDragOver={(e) => {
             e.preventDefault();
+            e.stopPropagation();
             setIsDragging(true);
           }}
-          onDragLeave={() => setIsDragging(false)}
+          onDragLeave={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setIsDragging(false);
+          }}
           onDrop={handleDrop}
           className={`
             border-2 border-dashed rounded-xl p-6 text-center transition-all cursor-pointer select-none
@@ -220,6 +229,7 @@ export function BulkUploadModal({
             type="file"
             accept=".csv,.txt,.xlsx,.xls"
             onChange={handleFileChange}
+            onClick={(e) => e.stopPropagation()}
             className="hidden"
           />
 
@@ -238,14 +248,11 @@ export function BulkUploadModal({
                 Supports Excel (.xlsx, .xls), CSV, or TSV formats
               </p>
 
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="mt-3 pointer-events-none"
-              >
-                {fileName ? 'Change File' : 'Select Spreadsheet File'}
-              </Button>
+              <div className="mt-3 inline-block">
+                <span className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-surface-700 hover:bg-surface-600 text-slate-200 text-xs font-semibold border border-surface-600 transition-colors">
+                  {fileName ? 'Change File' : 'Select Spreadsheet File'}
+                </span>
+              </div>
             </>
           )}
         </div>
@@ -347,7 +354,10 @@ export function BulkUploadModal({
                       <td className="py-2 px-3 text-right">
                         <button
                           type="button"
-                          onClick={() => handleRemoveRow(idx)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRemoveRow(idx);
+                          }}
                           className="text-muted hover:text-danger p-1 rounded hover:bg-surface-700 cursor-pointer"
                         >
                           <Trash2 size={14} />
