@@ -386,34 +386,28 @@ export function DonorDashboard() {
           <div>
             <h2 className="font-display font-semibold text-lg text-white flex items-center gap-2">
               <Building2 size={20} className="text-brand-400" />
-              Active Blood Camps & Banks in {userProfile?.city || 'Your District'}
+              Upcoming Blood Donation Camps in {userProfile?.city || 'Your District'}
             </h2>
             <p className="text-xs text-muted mt-0.5">
-              Volunteer to donate blood locally.
+              Volunteer to donate blood at local charity drives.
             </p>
           </div>
         </div>
         
         {(() => {
-          const activeCamps = camps.filter(c => c.isActive && c.city.toLowerCase() === (userProfile?.city || '').toLowerCase());
-          if (activeCamps.length === 0) {
+          // TODO: Fetch temporary charity camps in the future. 
+          // Currently, we only have permanent blood banks in the database, so we force empty state.
+          const upcomingCamps: any[] = [];
+          
+          if (upcomingCamps.length === 0) {
             return (
               <div className="text-center py-10 bg-surface-700/30 rounded-xl border border-surface-600/30">
-                <p className="text-slate-200 font-medium text-sm">No active camps in your district right now.</p>
+                <p className="text-slate-200 font-medium text-sm">No upcoming blood donation camps in your district right now.</p>
               </div>
             );
           }
-          return (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {activeCamps.map(camp => (
-                <div key={camp.id} className="p-4 bg-surface-700/50 rounded-xl border border-surface-600/50">
-                  <h3 className="font-display font-bold text-white mb-1">{camp.name}</h3>
-                  <p className="text-xs text-muted mb-2">{camp.address}</p>
-                  <p className="text-xs font-semibold text-brand-400">{camp.phone}</p>
-                </div>
-              ))}
-            </div>
-          );
+          
+          return null;
         })()}
       </Card>
 
