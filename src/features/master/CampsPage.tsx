@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Plus, Edit2, Trash2, Building2, Search, MapPin, Phone } from 'lucide-react';
+import { Plus, Edit2, Trash2, Building2, Search, MapPin, Phone, FileSpreadsheet } from 'lucide-react';
 import { useAuth } from '@/core/context/AuthContext';
 import { useToast } from '@/core/context/ToastContext';
 import { Button } from '@/components/ui/Button';
@@ -8,6 +8,7 @@ import { Select, type SelectOption } from '@/components/ui/Select';
 import { Modal, ConfirmDialog } from '@/components/ui/Modal';
 import { Card } from '@/components/ui/Card';
 import { CITY_OPTIONS } from '@/core/constants/indianCities';
+import { BulkUploadModal } from './components/BulkUploadModal';
 import {
   subscribeCamps,
   createCamp,
@@ -36,7 +37,8 @@ export function CampsPage() {
   const [coordinatorUid, setCoordinatorUid] = useState('');
   const [saving, setSaving] = useState(false);
 
-  // Delete Confirm State
+  // Bulk Upload Modal State
+  const [bulkModalOpen, setBulkModalOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Camp | null>(null);
   const [deleting, setDeleting] = useState(false);
 
@@ -173,9 +175,18 @@ export function CampsPage() {
           </p>
         </div>
 
-        <Button variant="primary" icon={<Plus size={18} />} onClick={handleOpenAdd}>
-          Add Camp
-        </Button>
+        <div className="flex flex-wrap items-center gap-3">
+          <Button
+            variant="outline"
+            icon={<FileSpreadsheet size={18} className="text-brand-400" />}
+            onClick={() => setBulkModalOpen(true)}
+          >
+            Bulk Import (Excel / CSV)
+          </Button>
+          <Button variant="primary" icon={<Plus size={18} />} onClick={handleOpenAdd}>
+            Add Camp
+          </Button>
+        </div>
       </div>
 
       {/* Search Bar */}
@@ -339,6 +350,12 @@ export function CampsPage() {
         message={`Are you sure you want to delete camp "${deleteTarget?.name}"?`}
         danger
         loading={deleting}
+      />
+      {/* Bulk Upload Modal */}
+      <BulkUploadModal
+        isOpen={bulkModalOpen}
+        onClose={() => setBulkModalOpen(false)}
+        entityType="camp"
       />
     </div>
   );

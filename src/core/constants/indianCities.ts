@@ -10,6 +10,7 @@ export const INDIAN_CITIES = [
   'Erode',
   'Kallakurichi',
   'Kancheepuram',
+  'Kanyakumari',
   'Karur',
   'Krishnagiri',
   'Madurai',

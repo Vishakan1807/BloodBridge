@@ -2,7 +2,7 @@ import React, { useEffect, type ReactNode } from 'react';
 import { X } from 'lucide-react';
 import { Button } from './Button';
 
-type ModalSize = 'sm' | 'md' | 'lg' | 'fullscreen';
+type ModalSize = 'sm' | 'md' | 'lg' | 'xl' | 'fullscreen';
 
 interface ModalProps {
   isOpen:   boolean;
@@ -16,6 +16,7 @@ const sizeClasses: Record<ModalSize, string> = {
   sm:         'max-w-sm',
   md:         'max-w-lg',
   lg:         'max-w-2xl',
+  xl:         'max-w-4xl',
   fullscreen: 'max-w-full h-full rounded-none',
 };
 

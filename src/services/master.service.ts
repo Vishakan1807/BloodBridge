@@ -89,6 +89,28 @@ export async function deleteCamp(id: string): Promise<void> {
   await remove(ref(db, `master/camps/${id}`));
 }
 
+export async function bulkCreateCamps(
+  campsData: Omit<Camp, 'id' | 'createdAt'>[],
+): Promise<number> {
+  if (!campsData || campsData.length === 0) return 0;
+  const updates: Record<string, Camp> = {};
+  const campsRef = ref(db, 'master/camps');
+  const now = Date.now();
+
+  campsData.forEach((data) => {
+    const newRef = push(campsRef);
+    const id = newRef.key!;
+    updates[`master/camps/${id}`] = {
+      ...data,
+      id,
+      createdAt: now,
+    };
+  });
+
+  await update(ref(db), updates);
+  return campsData.length;
+}
+
 // ── Hospitals Service ─────────────────────────────────────────
 
 export function subscribeHospitals(callback: (hospitals: Hospital[]) => void): Unsubscribe {
@@ -128,6 +150,28 @@ export async function updateHospital(
 
 export async function deleteHospital(id: string): Promise<void> {
   await remove(ref(db, `master/hospitals/${id}`));
+}
+
+export async function bulkCreateHospitals(
+  hospitalsData: Omit<Hospital, 'id' | 'createdAt'>[],
+): Promise<number> {
+  if (!hospitalsData || hospitalsData.length === 0) return 0;
+  const updates: Record<string, Hospital> = {};
+  const hospitalsRef = ref(db, 'master/hospitals');
+  const now = Date.now();
+
+  hospitalsData.forEach((data) => {
+    const newRef = push(hospitalsRef);
+    const id = newRef.key!;
+    updates[`master/hospitals/${id}`] = {
+      ...data,
+      id,
+      createdAt: now,
+    };
+  });
+
+  await update(ref(db), updates);
+  return hospitalsData.length;
 }
 
 // ── Inventory Service ─────────────────────────────────────────
