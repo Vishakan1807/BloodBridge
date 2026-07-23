@@ -301,7 +301,6 @@ export function HospitalsPage() {
       />
       {/* Bulk Upload Modal */}
       <BulkUploadModal
-        key={bulkModalOpen ? 'hospital-modal-open' : 'hospital-modal-closed'}
         isOpen={bulkModalOpen}
         onClose={() => setBulkModalOpen(false)}
         entityType="hospital"

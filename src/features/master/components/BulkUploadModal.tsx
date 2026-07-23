@@ -86,7 +86,7 @@ export function BulkUploadModal({
     }
   }
 
-  function handleDrop(e: React.DragEvent<HTMLDivElement>) {
+  function handleDrop(e: React.DragEvent<HTMLLabelElement>) {
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(false);
@@ -200,11 +200,7 @@ export function BulkUploadModal({
         </div>
 
         {/* Upload File Zone */}
-        <div
-          onClick={(e) => {
-            e.stopPropagation();
-            fileInputRef.current?.click();
-          }}
+        <label
           onDragOver={(e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -216,8 +212,9 @@ export function BulkUploadModal({
             setIsDragging(false);
           }}
           onDrop={handleDrop}
+          htmlFor="bulk-upload-input"
           className={`
-            border-2 border-dashed rounded-xl p-6 text-center transition-all cursor-pointer select-none
+            block border-2 border-dashed rounded-xl p-6 text-center transition-all cursor-pointer select-none
             ${isDragging
               ? 'border-brand-400 bg-brand-500/10 scale-[1.01]'
               : 'border-surface-600 hover:border-brand-500/60 bg-surface-800/40 hover:bg-surface-800/70'
@@ -225,6 +222,7 @@ export function BulkUploadModal({
           `}
         >
           <input
+            id="bulk-upload-input"
             ref={fileInputRef}
             type="file"
             accept=".csv,.txt,.xlsx,.xls"
@@ -239,7 +237,7 @@ export function BulkUploadModal({
               <p className="text-sm font-semibold text-white">Parsing spreadsheet data...</p>
             </div>
           ) : (
-            <>
+            <div className="pointer-events-none">
               <Upload size={32} className="mx-auto text-brand-400 mb-2" />
               <p className="text-sm font-semibold text-white">
                 {fileName ? `Loaded File: ${fileName}` : 'Click anywhere inside to select or Drag & Drop Excel / CSV file'}
@@ -253,9 +251,9 @@ export function BulkUploadModal({
                   {fileName ? 'Change File' : 'Select Spreadsheet File'}
                 </span>
               </div>
-            </>
+            </div>
           )}
-        </div>
+        </label>
 
         {/* Real-time Preview Table */}
         {parsedRows.length > 0 && (
