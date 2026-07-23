@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { Plus, Edit2, Trash2, Hospital as HospitalIcon, Search, MapPin, Phone, FileSpreadsheet } from 'lucide-react';
 import { useAuth } from '@/core/context/AuthContext';
 import { useToast } from '@/core/context/ToastContext';
@@ -113,11 +113,16 @@ export function HospitalsPage() {
     }
   }
 
-  const filteredHospitals = hospitals.filter(
-    (h) =>
-      h.name.toLowerCase().includes(search.toLowerCase()) ||
-      h.city.toLowerCase().includes(search.toLowerCase()),
-  );
+  const filteredHospitals = useMemo(() => {
+    const q = search.toLowerCase().trim();
+    if (!q) return hospitals;
+    return hospitals.filter(
+      (h) =>
+        h.name.toLowerCase().includes(q) ||
+        h.city.toLowerCase().includes(q) ||
+        (h.address && h.address.toLowerCase().includes(q)),
+    );
+  }, [hospitals, search]);
 
   return (
     <div className="space-y-6 page-enter">

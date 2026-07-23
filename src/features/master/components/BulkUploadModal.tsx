@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Upload, Download, FileSpreadsheet, CheckCircle2, AlertTriangle, XCircle, Trash2, ShieldCheck } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
@@ -38,6 +38,18 @@ export function BulkUploadModal({
   const entityLabel = isCamp ? 'Blood Bank / Camp' : 'Hospital';
   const entityLabelPlural = isCamp ? 'camps' : 'hospitals';
 
+  // Reset modal state cleanly whenever modal closes/opens
+  useEffect(() => {
+    if (!isOpen) {
+      setParsedRows([]);
+      setFileName('');
+      setImporting(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  }, [isOpen]);
+
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -58,10 +70,12 @@ export function BulkUploadModal({
         return;
       }
       setParsedRows(rows);
+      if (e.target) e.target.value = '';
     };
 
     reader.onerror = () => {
       showError('Failed to read uploaded file.');
+      if (e.target) e.target.value = '';
     };
 
     reader.readAsText(file);

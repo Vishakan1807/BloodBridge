@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { Plus, Edit2, Trash2, Building2, Search, MapPin, Phone, FileSpreadsheet } from 'lucide-react';
 import { useAuth } from '@/core/context/AuthContext';
 import { useToast } from '@/core/context/ToastContext';
@@ -156,11 +156,16 @@ export function CampsPage() {
     })),
   ];
 
-  const filteredCamps = camps.filter(
-    (c) =>
-      c.name.toLowerCase().includes(search.toLowerCase()) ||
-      c.city.toLowerCase().includes(search.toLowerCase()),
-  );
+  const filteredCamps = useMemo(() => {
+    const q = search.toLowerCase().trim();
+    if (!q) return camps;
+    return camps.filter(
+      (c) =>
+        c.name.toLowerCase().includes(q) ||
+        c.city.toLowerCase().includes(q) ||
+        (c.address && c.address.toLowerCase().includes(q)),
+    );
+  }, [camps, search]);
 
   return (
     <div className="space-y-6 page-enter">
