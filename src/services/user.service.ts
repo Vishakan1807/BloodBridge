@@ -1,4 +1,4 @@
-import { ref, set, get, update } from 'firebase/database';
+import { ref, set, get, update, remove } from 'firebase/database';
 import { db } from '@/core/config/firebase';
 import type { UserProfile, RegisterData } from '@/types/auth.types';
 
@@ -47,7 +47,6 @@ export async function updateUserProfile(
 
 // ── Delete User Account ───────────────────────────────────────
 export async function deleteUserAccount(uid: string): Promise<void> {
-  const { remove } = await import('firebase/database');
   const { deleteUser } = await import('firebase/auth');
   const { auth: fAuth } = await import('@/core/config/firebase');
 
