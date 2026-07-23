@@ -70,7 +70,7 @@ export function RoleAssignmentPage() {
   ];
 
   const filteredUsers = users.filter((u) =>
-    u.displayName.toLowerCase().includes(search.toLowerCase()) ||
+    (u.displayName || '').toLowerCase().includes(search.toLowerCase()) ||
     (u.email || '').toLowerCase().includes(search.toLowerCase())
   );
 

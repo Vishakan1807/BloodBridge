@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { Users, Search, Shield, UserCheck, UserX, History, Edit2 } from 'lucide-react';
+import { Users, Search, Shield, UserCheck, UserX, History, Edit2, Trash2, AlertTriangle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/core/context/AuthContext';
 import { useToast } from '@/core/context/ToastContext';
-import { listUsers, setRole, setActive } from '@/services/user.service';
+import { listUsers, setRole, setActive, deleteUserAccount } from '@/services/user.service';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -24,6 +24,10 @@ export function UserManagementPage() {
   const [targetUser, setTargetUser] = useState<UserProfile | null>(null);
   const [selectedRole, setSelectedRole] = useState<Role>('user');
   const [updating, setUpdating] = useState(false);
+
+  // Delete User Modal
+  const [deleteTarget, setDeleteTarget] = useState<UserProfile | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     loadUsers();
@@ -67,6 +71,25 @@ export function UserManagementPage() {
     }
   }
 
+  async function handleDeleteUser() {
+    if (!deleteTarget) return;
+    if (deleteTarget.uid === currentUser?.uid) {
+      showError('Security Guardrail: You cannot delete your own account.');
+      return;
+    }
+    setDeleting(true);
+    try {
+      await deleteUserAccount(deleteTarget.uid);
+      showSuccess(`User ${deleteTarget.displayName || 'Unknown'} has been permanently deleted.`);
+      setDeleteTarget(null);
+      loadUsers();
+    } catch (err: any) {
+      showError(err?.message || 'Failed to delete user.');
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   const roleFilterOptions: SelectOption[] = [
     { value: 'all', label: 'All Roles' },
     { value: 'admin', label: 'Admin' },
@@ -82,9 +105,9 @@ export function UserManagementPage() {
 
   const filteredUsers = users.filter((u) => {
     const matchesSearch =
-      u.displayName.toLowerCase().includes(search.toLowerCase()) ||
+      (u.displayName || '').toLowerCase().includes(search.toLowerCase()) ||
       (u.email || '').toLowerCase().includes(search.toLowerCase()) ||
-      u.city.toLowerCase().includes(search.toLowerCase());
+      (u.city || '').toLowerCase().includes(search.toLowerCase());
 
     const matchesRole = roleFilter === 'all' || u.role === roleFilter;
 
@@ -196,11 +219,19 @@ export function UserManagementPage() {
                       <button
                         onClick={() => handleToggleActive(u)}
                         className={`p-1.5 rounded-lg hover:bg-surface-700 transition-colors ${
-                          u.isActive ? 'text-muted hover:text-danger' : 'text-muted hover:text-success'
+                          u.isActive ? 'text-muted hover:text-warning' : 'text-muted hover:text-success'
                         }`}
                         title={u.isActive ? 'Deactivate Account' : 'Reactivate Account'}
                       >
                         {u.isActive ? <UserX size={16} /> : <UserCheck size={16} />}
+                      </button>
+
+                      <button
+                        onClick={() => setDeleteTarget(u)}
+                        className="p-1.5 rounded-lg text-muted hover:text-danger hover:bg-surface-700 transition-colors"
+                        title="Permanently Delete Account"
+                      >
+                        <Trash2 size={16} />
                       </button>
                     </td>
                   </tr>
@@ -231,6 +262,34 @@ export function UserManagementPage() {
             </Button>
             <Button variant="primary" onClick={handleSaveRole} loading={updating}>
               Save Role
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Delete User Modal */}
+      <Modal
+        isOpen={Boolean(deleteTarget)}
+        onClose={() => setDeleteTarget(null)}
+        title="Confirm User Deletion"
+      >
+        <div className="space-y-4">
+          <div className="bg-danger/10 border border-danger/30 rounded-xl p-3.5 space-y-1.5">
+            <div className="flex items-center gap-2 text-danger font-semibold text-sm">
+              <AlertTriangle size={16} /> Permanent Action
+            </div>
+            <p className="text-xs text-slate-300">
+              Are you sure you want to permanently delete <strong>{deleteTarget?.displayName || 'this user'}</strong>? 
+              This will remove their profile and authentication records. This action cannot be undone.
+            </p>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4 border-t border-surface-700">
+            <Button variant="ghost" onClick={() => setDeleteTarget(null)} disabled={deleting}>
+              Cancel
+            </Button>
+            <Button variant="danger" onClick={handleDeleteUser} loading={deleting}>
+              Delete User
             </Button>
           </div>
         </div>
