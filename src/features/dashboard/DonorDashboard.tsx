@@ -17,8 +17,8 @@ import { STATE_CONFIG } from '@/core/constants/workflowStates';
 import { setDonorAvailability } from '@/services/user.service';
 import { individualDonate } from '@/services/workflow.service';
 import { isBloodCompatible, sortByUrgencyAndDate } from '@/core/utils/bloodUtils';
-import { subscribeHospitals } from '@/services/master.service';
-import type { Hospital } from '@/types/master.types';
+import { subscribeHospitals, subscribeCamps } from '@/services/master.service';
+import type { Hospital, Camp } from '@/types/master.types';
 import type { DonationRequest } from '@/types/request.types';
 
 interface DonorRequestSummary {
@@ -41,6 +41,7 @@ export function DonorDashboard() {
   const [requests, setRequests]           = useState<DonorRequestSummary[]>([]);
   const [broadcastReqs, setBroadcastReqs] = useState<DonationRequest[]>([]);
   const [hospitals, setHospitals]         = useState<Hospital[]>([]);
+  const [camps, setCamps]                 = useState<Camp[]>([]);
   const [loading, setLoading]             = useState(true);
   const [togglingAvail, setTogglingAvail] = useState(false);
 
@@ -48,9 +49,14 @@ export function DonorDashboard() {
   const [donateTarget, setDonateTarget] = useState<DonationRequest | null>(null);
   const [donating, setDonating]         = useState(false);
 
-  // Load hospitals from DB to resolve hospital districts live
+  // Load hospitals & camps from DB
   useEffect(() => {
-    return subscribeHospitals((loadedHospitals) => setHospitals(loadedHospitals));
+    const unsubHospitals = subscribeHospitals((loaded) => setHospitals(loaded));
+    const unsubCamps = subscribeCamps((loaded) => setCamps(loaded));
+    return () => {
+      unsubHospitals();
+      unsubCamps();
+    };
   }, []);
 
   // ── 56-day eligibility calculation ─────────────────────────
@@ -130,9 +136,9 @@ export function DonorDashboard() {
       const result = await individualDonate(donateTarget.id, userProfile);
       await refreshProfile(); // Refresh to get updated lastDonationDate
       if (result.fulfilled) {
-        showSuccess(`🎉 Request ${donateTarget.referenceNumber} fully fulfilled! Your 1 unit completed the requirement.`);
+        showSuccess(`Thanks for saving a life! 🎉 Request ${donateTarget.referenceNumber} fully fulfilled! Your 1 unit completed the requirement.`);
       } else {
-        showSuccess(`✅ 1 unit donated to ${donateTarget.referenceNumber}. ${result.unitsFulfilled}/${donateTarget.unitsRequired} units secured.`);
+        showSuccess(`Thanks for saving a life! ✅ 1 unit donated to ${donateTarget.referenceNumber}. ${result.unitsFulfilled}/${donateTarget.unitsRequired} units secured.`);
       }
       setDonateTarget(null);
     } catch (err: any) {
@@ -373,6 +379,43 @@ export function DonorDashboard() {
           )}
         </Card>
       )}
+
+      {/* ── Active Blood Camps in District ───────────────────── */}
+      <Card padding="lg">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+          <div>
+            <h2 className="font-display font-semibold text-lg text-white flex items-center gap-2">
+              <Building2 size={20} className="text-brand-400" />
+              Active Blood Camps & Banks in {userProfile?.city || 'Your District'}
+            </h2>
+            <p className="text-xs text-muted mt-0.5">
+              Volunteer to donate blood locally.
+            </p>
+          </div>
+        </div>
+        
+        {(() => {
+          const activeCamps = camps.filter(c => c.isActive && c.city.toLowerCase() === (userProfile?.city || '').toLowerCase());
+          if (activeCamps.length === 0) {
+            return (
+              <div className="text-center py-10 bg-surface-700/30 rounded-xl border border-surface-600/30">
+                <p className="text-slate-200 font-medium text-sm">No active camps in your district right now.</p>
+              </div>
+            );
+          }
+          return (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {activeCamps.map(camp => (
+                <div key={camp.id} className="p-4 bg-surface-700/50 rounded-xl border border-surface-600/50">
+                  <h3 className="font-display font-bold text-white mb-1">{camp.name}</h3>
+                  <p className="text-xs text-muted mb-2">{camp.address}</p>
+                  <p className="text-xs font-semibold text-brand-400">{camp.phone}</p>
+                </div>
+              ))}
+            </div>
+          );
+        })()}
+      </Card>
 
       {/* ── My Requests List ─────────────────────────────────── */}
       <Card padding="lg">
