@@ -2,7 +2,7 @@ import type { Role } from '@/core/constants/roles';
 
 export interface UserProfile {
   uid:                  string;
-  email:                string;
+  email?:               string;
   displayName:          string;
   phone:                string;
   city:                 string;
@@ -38,4 +38,11 @@ export interface RegisterFormState extends AuthFormState {
   phone:           string;
   city:            string;
   bloodGroup:      string;
+}
+
+export interface ProfileCompletionFormState {
+  displayName: string;
+  phone:       string;
+  city:        string;
+  bloodGroup:  string;
 }

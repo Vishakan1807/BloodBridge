@@ -83,7 +83,7 @@ export function UserManagementPage() {
   const filteredUsers = users.filter((u) => {
     const matchesSearch =
       u.displayName.toLowerCase().includes(search.toLowerCase()) ||
-      u.email.toLowerCase().includes(search.toLowerCase()) ||
+      (u.email || '').toLowerCase().includes(search.toLowerCase()) ||
       u.city.toLowerCase().includes(search.toLowerCase());
 
     const matchesRole = roleFilter === 'all' || u.role === roleFilter;

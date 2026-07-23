@@ -9,9 +9,9 @@ import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { CLINICAL_BLOOD_GROUPS } from '@/core/utils/bloodUtils';
 import { CITY_OPTIONS } from '@/core/constants/indianCities';
-import { updateUserProfile, deleteUserAccount } from '@/services/user.service';
+import { updateUserProfile } from '@/services/user.service';
 import { ROUTES } from '@/core/constants/routes';
-import { User, Mail, Phone, MapPin, Droplets, Trash2, AlertTriangle, ShieldAlert, CheckCircle2 } from 'lucide-react';
+import { User, Mail, Phone, MapPin, Droplets, CheckCircle2 } from 'lucide-react';
 
 export function ProfileSettingsPage() {
   const { userProfile, signOut, refreshProfile } = useAuth();
@@ -23,13 +23,6 @@ export function ProfileSettingsPage() {
   const [district, setDistrict]       = useState(userProfile?.city || '');
   const [bloodGroup, setBloodGroup]   = useState(userProfile?.bloodGroup || '');
   const [saving, setSaving]           = useState(false);
-
-  // Account Deletion Modal State
-  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
-  const [confirmText, setConfirmText]         = useState('');
-  const [deleting, setDeleting]               = useState(false);
-
-  const TARGET_CONFIRM_TEXT = 'I am deleting my account';
 
   useEffect(() => {
     if (userProfile) {
@@ -87,24 +80,7 @@ export function ProfileSettingsPage() {
     }
   }
 
-  async function handleDeleteAccount() {
-    if (!userProfile?.uid) return;
-    if (confirmText.trim() !== TARGET_CONFIRM_TEXT) {
-      showError(`Please type "${TARGET_CONFIRM_TEXT}" exactly to confirm.`);
-      return;
-    }
 
-    setDeleting(true);
-    try {
-      await deleteUserAccount(userProfile.uid);
-      await signOut();
-      showSuccess('Your BloodBridge account has been permanently deleted.');
-      navigate(ROUTES.LOGIN, { replace: true });
-    } catch (err: any) {
-      showError(err?.message || 'Failed to delete account.');
-      setDeleting(false);
-    }
-  }
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto page-enter">
@@ -180,74 +156,6 @@ export function ProfileSettingsPage() {
         </form>
       </Card>
 
-      {/* Danger Zone: Account Deletion */}
-      <Card padding="lg" className="border-danger/30 bg-danger/5 space-y-4">
-        <h2 className="font-display font-semibold text-lg text-danger flex items-center gap-2">
-          <Trash2 size={18} /> Danger Zone — Delete Account
-        </h2>
-
-        <p className="text-xs text-slate-300 leading-relaxed">
-          Once you delete your account, your profile, donation preferences, and records will be permanently removed from BloodBridge. This action <strong>cannot be undone</strong>.
-        </p>
-
-        <div className="pt-2">
-          <Button
-            variant="danger"
-            onClick={() => {
-              setConfirmText('');
-              setDeleteModalOpen(true);
-            }}
-            icon={<Trash2 size={16} />}
-          >
-            Delete My Account
-          </Button>
-        </div>
-      </Card>
-
-      {/* ── Strict Account Deletion Modal ────────────────────────────── */}
-      <Modal
-        isOpen={deleteModalOpen}
-        onClose={() => setDeleteModalOpen(false)}
-        title="Confirm Permanent Account Deletion"
-      >
-        <div className="space-y-4">
-          <div className="bg-danger/10 border border-danger/30 rounded-xl p-4 text-xs text-slate-200 space-y-2">
-            <p className="font-bold text-danger text-sm flex items-center gap-1.5">
-              <ShieldAlert size={16} /> Warning: Irreversible Action
-            </p>
-            <p>
-              Are you sure you want to delete your account (<strong>{userProfile?.email}</strong>)? All your data will be permanently wiped.
-            </p>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-200 mb-1.5">
-              To confirm deletion, please type <strong className="text-danger select-all font-mono">{TARGET_CONFIRM_TEXT}</strong> below:
-            </label>
-            <Input
-              placeholder="I am deleting my account"
-              value={confirmText}
-              onChange={(e) => setConfirmText(e.target.value)}
-              autoFocus
-            />
-          </div>
-
-          <div className="flex justify-end gap-3 pt-4 border-t border-surface-700">
-            <Button variant="ghost" onClick={() => setDeleteModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              variant="danger"
-              disabled={confirmText.trim() !== TARGET_CONFIRM_TEXT}
-              loading={deleting}
-              onClick={handleDeleteAccount}
-              icon={<Trash2 size={16} />}
-            >
-              Permanently Delete My Account
-            </Button>
-          </div>
-        </div>
-      </Modal>
     </div>
   );
 }

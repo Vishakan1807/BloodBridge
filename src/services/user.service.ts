@@ -5,17 +5,17 @@ import type { UserProfile, RegisterData } from '@/types/auth.types';
 // ── Create Profile (called after signUp) ─────────────────────
 export async function createProfile(
   uid: string,
-  email: string,
-  data: RegisterData,
+  email: string | undefined,
+  data: Partial<UserProfile>,
 ): Promise<void> {
   const profile: UserProfile = {
     uid,
     email,
-    displayName:  data.displayName,
-    phone:        data.phone,
-    city:         data.city,
+    displayName:  data.displayName || 'Unknown',
+    phone:        data.phone || '',
+    city:         data.city || '',
     role:         'user',           // Always 'user' on self-registration
-    bloodGroup:   data.bloodGroup,
+    bloodGroup:   data.bloodGroup || null,
     campId:       null,
     isActive:     true,
     isVerified:   false,
@@ -121,5 +121,22 @@ export async function getAvailableDonorsInDistrict(district: string): Promise<Us
       u.isActive &&
       u.isAvailableToDonate === true &&
       u.city?.toLowerCase() === district.toLowerCase(),
+  );
+}
+
+// ── Get compatible donors in a district (Emergency Directory) ──
+export async function getCompatibleDonorsInDistrict(district: string, requiredBloodGroup: string): Promise<UserProfile[]> {
+  const { isBloodCompatible } = await import('@/core/utils/bloodUtils');
+  const snapshot = await get(ref(db, 'users'));
+  if (!snapshot.exists()) return [];
+  const users = Object.values(snapshot.val()) as UserProfile[];
+  
+  return users.filter(
+    (u) =>
+      u.role === 'user' &&
+      u.isActive &&
+      u.city?.toLowerCase() === district.toLowerCase() &&
+      u.bloodGroup &&
+      isBloodCompatible(u.bloodGroup, requiredBloodGroup)
   );
 }

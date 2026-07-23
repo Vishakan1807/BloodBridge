@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Edit, Hospital, ShieldCheck, Target, CheckCircle2, AlertCircle, PackageCheck, Clock, Radio, Phone, User } from 'lucide-react';
+import { ArrowLeft, Edit, Hospital, ShieldCheck, Target, CheckCircle2, AlertCircle, PackageCheck, Clock, Radio, Phone, User, Search, MapPin } from 'lucide-react';
 import { useRequestDetail } from '../hooks/useRequestDetail';
 import { useAuth } from '@/core/context/AuthContext';
 import { useToast } from '@/core/context/ToastContext';
@@ -12,8 +12,11 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { STATE_CONFIG } from '@/core/constants/workflowStates';
-import { transitionWorkflowState, rebroadcastRequest } from '@/services/workflow.service';
-import { getProfile } from '@/services/user.service';
+import { getProfile, getCompatibleDonorsInDistrict } from '@/services/user.service';
+import { getCampsInDistrict } from '@/services/master.service';
+import { transitionWorkflowState } from '@/services/workflow.service';
+import type { UserProfile } from '@/types/auth.types';
+import type { Camp } from '@/types/master.types';
 import { NotFoundPage } from '@/components/feedback/PageError';
 
 export function RequestDetail() {
@@ -23,14 +26,17 @@ export function RequestDetail() {
   const { showSuccess, showError } = useToast();
   const navigate = useNavigate();
 
+  // Emergency Directory State
+  const [directoryModalOpen, setDirectoryModalOpen] = useState(false);
+  const [directoryTab, setDirectoryTab] = useState<'donors' | 'camps'>('donors');
+  const [compatibleDonors, setCompatibleDonors] = useState<UserProfile[]>([]);
+  const [camps, setCamps] = useState<Camp[]>([]);
+  const [fetchingDirectory, setFetchingDirectory] = useState(false);
+
   // Workflow Transition Modal States
   const [closeModalOpen, setCloseModalOpen]         = useState(false);
   const [closureNotes, setClosureNotes]               = useState('');
   const [transitioning, setTransitioning]             = useState(false);
-
-  // Rebroadcast Modal
-  const [rebroadcastModalOpen, setRebroadcastModalOpen] = useState(false);
-  const [rebroadcasting, setRebroadcasting]             = useState(false);
 
   // Live Donor Phone Lookup (for records predating donorPhone field or cached donors)
   const [donorPhones, setDonorPhones] = useState<Record<string, string>>({});
@@ -116,17 +122,25 @@ export function RequestDetail() {
     }
   }
 
-  async function handleRebroadcast() {
-    if (!userProfile || !request) return;
-    setRebroadcasting(true);
+  async function openEmergencyDirectory() {
+    if (!request) return;
+    setDirectoryModalOpen(true);
+    setFetchingDirectory(true);
     try {
-      await rebroadcastRequest(request.id, userProfile);
-      showSuccess(`Request ${request.referenceNumber} has been rebroadcast. All eligible donors and blood banks in ${request.donorCity} will see the updated requirement.`);
-      setRebroadcastModalOpen(false);
+      const donorCity = request.donorCity || '';
+      const bg = request.requiredBloodGroup;
+      
+      const [fetchedDonors, fetchedCamps] = await Promise.all([
+        getCompatibleDonorsInDistrict(donorCity, bg),
+        getCampsInDistrict(donorCity)
+      ]);
+      
+      setCompatibleDonors(fetchedDonors);
+      setCamps(fetchedCamps);
     } catch (err: any) {
-      showError(err?.message || 'Failed to rebroadcast request.');
+      showError('Failed to load emergency directory');
     } finally {
-      setRebroadcasting(false);
+      setFetchingDirectory(false);
     }
   }
 
@@ -144,11 +158,13 @@ export function RequestDetail() {
         <div className="flex items-center gap-3 flex-wrap">
           {canEdit && (
             <Link to={`/requests/${request.id}/edit`}>
-              <Button variant="secondary" size="sm" icon={<Edit size={16} />}>
+              <Button variant="outline" size="sm" icon={<Edit size={16} />}>
                 Edit Request
               </Button>
             </Link>
           )}
+
+
 
           {/* Workflow Actions for Manager / Admin */}
           {(isManager || isAdmin) && (
@@ -182,30 +198,18 @@ export function RequestDetail() {
             </>
           )}
 
-          {/* Admin only: Rebroadcast button (reset individual donors & re-open) */}
-          {isAdmin && (request.status === 'verified' || request.status === 'donated') &&
-            individualDonations.length > 0 && (
-            <Button
-              variant="secondary"
-              size="sm"
-              icon={<Radio size={16} />}
-              onClick={() => setRebroadcastModalOpen(true)}
-            >
-              Rebroadcast Request
-            </Button>
-          )}
-
-          {/* Donor: Confirm Blood Received & Close */}
-          {isOwner && request.status === 'donated' && (
+          {/* Requester: Close Case */}
+          {isOwner && request.status !== 'closed' && (
             <Button
               variant="primary"
               size="sm"
-              icon={<PackageCheck size={16} />}
+              icon={request.status === 'donated' ? <PackageCheck size={16} /> : <CheckCircle2 size={16} />}
               onClick={() => setCloseModalOpen(true)}
             >
-              ✅ Confirm Blood Received & Close
+              {request.status === 'donated' ? '✅ Confirm Blood Received & Close Case' : 'Close Request (Found Blood)'}
             </Button>
           )}
+
         </div>
       </div>
 
@@ -232,6 +236,24 @@ export function RequestDetail() {
             <span className="text-sm font-normal text-muted">({request.unitsRequired} units)</span>
           </div>
         </div>
+
+        {/* Action Buttons */}
+        {request.status !== 'closed' && (
+          <div className="mt-6 mb-2 space-y-3">
+            <Button
+              variant="primary"
+              className="w-full py-4 text-base sm:text-lg font-bold justify-center shadow-[0_0_15px_rgba(225,29,72,0.4)] hover:shadow-[0_0_25px_rgba(225,29,72,0.6)] transition-all"
+              icon={<Phone size={20} className="animate-pulse" />}
+              onClick={openEmergencyDirectory}
+            >
+              Contact Available Donors & Blood Banks
+            </Button>
+
+            <p className="text-center text-xs text-muted mt-2">
+              Instantly view and contact registered donors and blood banks in <strong className="text-slate-300">{request.donorCity}</strong>.
+            </p>
+          </div>
+        )}
 
         {/* Workflow Lifecycle Progress */}
         <div className="pt-6">
@@ -450,52 +472,139 @@ export function RequestDetail() {
         </div>
       </Modal>
 
-      {/* ── Rebroadcast Modal ───────────────────────────────── */}
+      {/* ── Emergency Directory Modal ─────────────────────────── */}
       <Modal
-        isOpen={rebroadcastModalOpen}
-        onClose={() => setRebroadcastModalOpen(false)}
-        title={`Rebroadcast Request — ${request.referenceNumber}`}
+        isOpen={directoryModalOpen}
+        onClose={() => setDirectoryModalOpen(false)}
+        title={`Available Donors & Blood Banks — ${request.donorCity}`}
+        size="lg"
       >
         <div className="space-y-4">
-          <div className="bg-warning/10 border border-warning/30 rounded-xl p-4 text-xs text-slate-300 space-y-2">
-            <p className="font-semibold text-warning text-sm flex items-center gap-2">
-              <Radio size={15} /> Emergency Rebroadcast
-            </p>
-            <p>
-              Use this when a committed donor is <strong>unreachable or unable to donate</strong>.
-              This will:
-            </p>
-            <ul className="list-disc list-inside space-y-1 text-muted ml-1">
-              <li>Reset all individual donor commitments for this request</li>
-              <li>Restore the required units back to <strong className="text-white">{request.unitsRequired} unit(s)</strong></li>
-              <li>Rebroadcast to all available donors and blood banks in <strong className="text-white">{request.donorCity}</strong></li>
-            </ul>
-            <p className="text-warning font-semibold mt-2">
-              ⚠️ Only do this after confirming the donor is truly unreachable via the Comments section.
-            </p>
+          <p className="text-sm text-slate-300">
+            Immediate contacts available in <strong>{request.donorCity}</strong> for <strong>{request.requiredBloodGroup}</strong>.
+          </p>
+
+          <div className="flex gap-2 border-b border-surface-700 pb-2">
+            <button
+              onClick={() => setDirectoryTab('donors')}
+              className={`px-4 py-2 text-sm font-semibold rounded-t-lg transition-colors ${
+                directoryTab === 'donors'
+                  ? 'bg-surface-700 text-brand-400 border-b-2 border-brand-400'
+                  : 'text-muted hover:text-slate-200'
+              }`}
+            >
+              Compatible Donors ({compatibleDonors.length})
+            </button>
+            <button
+              onClick={() => setDirectoryTab('camps')}
+              className={`px-4 py-2 text-sm font-semibold rounded-t-lg transition-colors ${
+                directoryTab === 'camps'
+                  ? 'bg-surface-700 text-info border-b-2 border-info'
+                  : 'text-muted hover:text-slate-200'
+              }`}
+            >
+              Blood Banks ({camps.length})
+            </button>
           </div>
 
-          {/* Show who will be removed */}
-          {individualDonations.length > 0 && (
-            <div className="space-y-1.5">
-              <p className="text-xs text-muted font-semibold uppercase tracking-wider">Donor commitments to be reset:</p>
-              {individualDonations.map((d, i) => (
-                <div key={i} className="flex justify-between text-xs bg-surface-700/50 px-3 py-2 rounded-lg border border-danger/20">
-                  <span className="text-slate-200">👤 {d.donorName} ({d.donorDistrict})</span>
-                  <span className="text-danger font-bold">Will be removed</span>
+          <div className="max-h-[50vh] overflow-y-auto pr-2 custom-scrollbar">
+            {fetchingDirectory ? (
+              <div className="space-y-3">
+                <div className="skeleton h-16 w-full" />
+                <div className="skeleton h-16 w-full" />
+              </div>
+            ) : directoryTab === 'donors' ? (
+              compatibleDonors.length > 0 ? (
+                <div className="overflow-x-auto border border-surface-700 rounded-xl">
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-surface-700/60 text-muted text-xs uppercase tracking-wider">
+                      <tr>
+                        <th className="py-3 px-4 font-semibold">Name</th>
+                        <th className="py-3 px-4 font-semibold">Blood Group</th>
+                        <th className="py-3 px-4 font-semibold">Location</th>
+                        <th className="py-3 px-4 font-semibold text-right">Contact</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-surface-700">
+                      {compatibleDonors.map(donor => (
+                        <tr key={donor.uid} className="hover:bg-surface-700/30 transition-colors">
+                          <td className="py-3 px-4 font-medium text-slate-200">{donor.displayName}</td>
+                          <td className="py-3 px-4">
+                            <span className="font-display font-bold text-brand-400 bg-brand-500/10 px-2 py-0.5 rounded text-xs">
+                              {donor.bloodGroup}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4">
+                            <span className="text-muted flex items-center gap-1.5"><MapPin size={12} /> {donor.city}</span>
+                          </td>
+                          <td className="py-3 px-4 text-right">
+                            {donor.phone ? (
+                              <a href={`tel:${donor.phone}`} className="inline-flex items-center gap-1.5 text-xs font-semibold text-info bg-info/10 hover:bg-info/20 px-2.5 py-1.5 rounded-lg transition-colors">
+                                <Phone size={14} /> {donor.phone}
+                              </a>
+                            ) : (
+                              <span className="text-muted text-xs">—</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-              ))}
-            </div>
-          )}
+              ) : (
+                <div className="text-center py-8 text-muted text-sm border border-dashed border-surface-700 rounded-xl">
+                  No compatible donors found in {request.donorCity}.
+                </div>
+              )
+            ) : (
+              camps.length > 0 ? (
+                <div className="overflow-x-auto border border-surface-700 rounded-xl">
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-surface-700/60 text-muted text-xs uppercase tracking-wider">
+                      <tr>
+                        <th className="py-3 px-4 font-semibold">Blood Bank Name</th>
+                        <th className="py-3 px-4 font-semibold">Location</th>
+                        <th className="py-3 px-4 font-semibold text-right">Contact</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-surface-700">
+                      {camps.map(camp => (
+                        <tr key={camp.id} className="hover:bg-surface-700/30 transition-colors">
+                          <td className="py-3 px-4 font-medium text-slate-200">
+                            {camp.name}
+                            <span className="block text-[10px] text-muted uppercase mt-0.5 tracking-wider">BLOOD BANK</span>
+                          </td>
+                          <td className="py-3 px-4">
+                            <span className="text-muted flex items-center gap-1.5"><MapPin size={12} /> {camp.city}</span>
+                          </td>
+                          <td className="py-3 px-4 text-right">
+                            {camp.phone ? (
+                              <a href={`tel:${camp.phone}`} className="inline-flex items-center gap-1.5 text-xs font-semibold text-info bg-info/10 hover:bg-info/20 px-2.5 py-1.5 rounded-lg transition-colors">
+                                <Phone size={14} /> {camp.phone}
+                              </a>
+                            ) : (
+                              <span className="text-muted text-xs">—</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="text-center py-8 text-muted text-sm border border-dashed border-surface-700 rounded-xl">
+                  No blood banks or camps found in {request.donorCity}.
+                </div>
+              )
+            )}
+          </div>
 
-          <div className="flex justify-end gap-3 pt-4 border-t border-surface-700">
-            <Button variant="ghost" onClick={() => setRebroadcastModalOpen(false)}>Cancel</Button>
-            <Button variant="primary" icon={<Radio size={16} />} loading={rebroadcasting} onClick={handleRebroadcast}>
-              Confirm Rebroadcast
-            </Button>
+          <div className="flex justify-end pt-2 border-t border-surface-700">
+            <Button variant="ghost" onClick={() => setDirectoryModalOpen(false)}>Close Directory</Button>
           </div>
         </div>
       </Modal>
+
     </div>
   );
 }

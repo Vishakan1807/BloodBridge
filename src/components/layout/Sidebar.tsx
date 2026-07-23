@@ -41,7 +41,6 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { label: 'Donation Requests', path: ROUTES.REQUESTS,        icon: <ClipboardList size={18} />, allowedRoles: ['admin', 'manager'] },
       { label: 'My Requests',       path: ROUTES.REQUESTS,        icon: <ClipboardList size={18} />, allowedRoles: ['user'] },
-      { label: 'Verify Donors',     path: ROUTES.WORKFLOW_VERIFY, icon: <ShieldCheck size={18} />,  allowedRoles: ['admin', 'manager'] },
       { label: 'Match Donors',      path: ROUTES.WORKFLOW_MATCH,  icon: <Target size={18} />,        allowedRoles: ['admin', 'manager'] },
       { label: 'Hospitals',         path: ROUTES.MASTER_HOSPITALS, icon: <Hospital size={18} />,    allowedRoles: ['admin', 'manager'] },
       { label: 'Blood Camps & Banks', path: ROUTES.MASTER_CAMPS,  icon: <Building2 size={18} />,    allowedRoles: ['admin', 'manager'] },
@@ -185,14 +184,6 @@ export function Sidebar({ isOpen, isCollapsed, onClose, onToggleCollapse }: Side
             )}
             {!isCollapsed && (
               <div className="flex items-center gap-1">
-                <NavLink
-                  to={ROUTES.SETTINGS}
-                  className="text-muted hover:text-white transition-colors p-1 rounded-md hover:bg-surface-700 cursor-pointer"
-                  aria-label="Account Settings"
-                  title="Account & Location Settings"
-                >
-                  <Settings size={16} />
-                </NavLink>
                 <button
                   onClick={() => setShowConfirmLogout(true)}
                   className="text-muted hover:text-danger transition-colors p-1 rounded-md hover:bg-surface-700 cursor-pointer"

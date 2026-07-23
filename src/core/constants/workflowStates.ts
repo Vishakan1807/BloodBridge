@@ -22,9 +22,11 @@ export const ALLOWED_TRANSITIONS: Record<WorkflowState, AllowedTransition[]> = {
   ],
   verified: [
     { toState: 'matched', allowedRoles: ['manager', 'admin'] },
+    { toState: 'closed', allowedRoles: ['user', 'manager', 'admin'], requiresNote: true },
   ],
   matched: [
     { toState: 'donated', allowedRoles: ['manager', 'admin'] },
+    { toState: 'closed', allowedRoles: ['user', 'manager', 'admin'], requiresNote: true },
   ],
   donated: [
     { toState: 'closed', allowedRoles: ['user', 'manager', 'admin'], requiresNote: true },
@@ -45,15 +47,15 @@ export interface StateConfig {
 }
 
 export const STATE_CONFIG: Record<WorkflowState, StateConfig> = {
-  registered: { label: 'Registered', color: 'text-neutral-400',  bgColor: 'bg-surface-700',    dotColor: 'bg-neutral-400', step: 1 },
-  verified:   { label: 'Verified',   color: 'text-info',          bgColor: 'bg-info-dim',        dotColor: 'bg-info',        step: 2 },
-  matched:    { label: 'Matched',    color: 'text-warning',       bgColor: 'bg-warning-dim',     dotColor: 'bg-warning',     step: 3 },
-  donated:    { label: 'Donated',    color: 'text-success',       bgColor: 'bg-success-dim',     dotColor: 'bg-success',     step: 4 },
-  closed:     { label: 'Closed',     color: 'text-muted',         bgColor: 'bg-surface-700',     dotColor: 'bg-muted',       step: 5 },
+  registered: { label: 'Registered', color: 'text-neutral-400',  bgColor: 'bg-surface-700',    dotColor: 'bg-neutral-400', step: 0 },
+  verified:   { label: 'Broadcasted', color: 'text-info',          bgColor: 'bg-info-dim',        dotColor: 'bg-info',        step: 1 },
+  matched:    { label: 'Matched',    color: 'text-warning',       bgColor: 'bg-warning-dim',     dotColor: 'bg-warning',     step: 2 },
+  donated:    { label: 'Donated',    color: 'text-success',       bgColor: 'bg-success-dim',     dotColor: 'bg-success',     step: 3 },
+  closed:     { label: 'Closed',     color: 'text-muted',         bgColor: 'bg-surface-700',     dotColor: 'bg-muted',       step: 4 },
 };
 
 export const WORKFLOW_STATES_ORDERED: WorkflowState[] = [
-  'registered', 'verified', 'matched', 'donated', 'closed',
+  'verified', 'matched', 'donated', 'closed',
 ];
 
 export const TRANSITION_BUTTON_LABELS: Partial<Record<WorkflowState, string>> = {

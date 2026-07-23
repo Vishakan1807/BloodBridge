@@ -1,5 +1,5 @@
 import React, { useState, useEffect, type FormEvent } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { User, Mail, Lock, Eye, EyeOff, Phone, Droplets } from 'lucide-react';
 import { get, ref } from 'firebase/database';
 import { db } from '@/core/config/firebase';
@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/Input';
 import { Select, type SelectOption } from '@/components/ui/Select';
 import { Button } from '@/components/ui/Button';
 import { ROUTES } from '@/core/constants/routes';
-import { checkEmailExists } from '@/services/user.service';
+import { checkEmailExists, createProfile } from '@/services/user.service';
 
 import { CLINICAL_BLOOD_GROUPS } from '@/core/utils/bloodUtils';
 import { CITY_OPTIONS } from '@/core/constants/indianCities';
@@ -58,13 +58,17 @@ interface FormState {
 interface FormErrors extends Partial<FormState> {}
 
 export default function RegisterPage() {
-  const { signUp, signInWithGoogle } = useAuth();
+  const { signUp, signInWithGoogle, currentUser } = useAuth();
   const { showError, showSuccess, showWarning } = useToast();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const phoneAuth = location.state?.phoneAuth || false;
+  const initPhone = location.state?.phoneNumber || '';
 
   const [form,          setForm]          = useState<FormState>({
     displayName: '', email: '', password: '', confirmPassword: '',
-    phone: '', city: '', bloodGroup: '',
+    phone: initPhone, city: '', bloodGroup: '',
   });
   const [errors,        setErrors]        = useState<FormErrors>({});
   const [showPwd,       setShowPwd]       = useState(false);
@@ -139,14 +143,16 @@ export default function RegisterPage() {
     if (!form.displayName.trim())             errs.displayName = 'Full name is required.';
     else if (form.displayName.trim().length < 2) errs.displayName = 'Name must be at least 2 characters.';
 
-    if (!form.email)                              errs.email = 'Email is required.';
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errs.email = 'Enter a valid email.';
+    if (!phoneAuth) {
+      if (!form.email)                              errs.email = 'Email is required.';
+      else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errs.email = 'Enter a valid email.';
 
-    if (!form.password)                           errs.password = 'Password is required.';
-    else if (form.password.length < 8)            errs.password = 'Password must be at least 8 characters.';
+      if (!form.password)                           errs.password = 'Password is required.';
+      else if (form.password.length < 8)            errs.password = 'Password must be at least 8 characters.';
 
-    if (!form.confirmPassword)                    errs.confirmPassword = 'Please confirm your password.';
-    else if (form.password !== form.confirmPassword) errs.confirmPassword = 'Passwords do not match.';
+      if (!form.confirmPassword)                    errs.confirmPassword = 'Please confirm your password.';
+      else if (form.password !== form.confirmPassword) errs.confirmPassword = 'Passwords do not match.';
+    }
 
     if (!form.phone)                              errs.phone = 'Phone number is required.';
     else if (!isValidIndianPhone(form.phone))
@@ -164,14 +170,25 @@ export default function RegisterPage() {
     if (!validate()) return;
     setLoading(true);
     try {
-      await signUp(form.email, form.password, {
-        displayName: form.displayName.trim(),
-        phone:       form.phone.replace(/\s/g, ''),
-        city:        form.city.trim(),
-        bloodGroup:  form.bloodGroup,
-      });
-      showSuccess('Account created successfully! Welcome to BloodBridge.');
-      navigate(ROUTES.DASHBOARD, { replace: true });
+      if (phoneAuth && currentUser) {
+        await createProfile(currentUser.uid, undefined, {
+          displayName: form.displayName.trim(),
+          phone:       form.phone.replace(/\s/g, ''),
+          city:        form.city.trim(),
+          bloodGroup:  form.bloodGroup,
+        });
+        showSuccess('Profile completed successfully! Welcome to BloodBridge.');
+        navigate(ROUTES.DASHBOARD, { replace: true });
+      } else {
+        await signUp(form.email, form.password, {
+          displayName: form.displayName.trim(),
+          phone:       form.phone.replace(/\s/g, ''),
+          city:        form.city.trim(),
+          bloodGroup:  form.bloodGroup,
+        });
+        showSuccess('Account created successfully! Welcome to BloodBridge.');
+        navigate(ROUTES.DASHBOARD, { replace: true });
+      }
     } catch (err: unknown) {
       const code = (err as { code?: string })?.code ?? '';
       showError(parseFirebaseError(code));
@@ -194,7 +211,9 @@ export default function RegisterPage() {
 
         <div className="bg-surface-800 border border-surface-600/40 rounded-2xl p-8">
           <div className="mb-6">
-            <h2 className="font-display font-bold text-2xl text-white mb-1">Create your account</h2>
+            <h2 className="font-display font-bold text-2xl text-white mb-1">
+              {phoneAuth ? 'Complete your profile' : 'Create your account'}
+            </h2>
             <p className="text-muted text-sm">Join BloodBridge as a donor</p>
           </div>
 
@@ -212,51 +231,55 @@ export default function RegisterPage() {
               required
             />
 
-            <Input
-              id="reg-email"
-              type="email"
-              label="Email address"
-              placeholder="you@example.com"
-              value={form.email}
-              onChange={(e) => {
-                setForm((prev) => ({ ...prev, email: e.target.value }));
-              }}
-              onBlur={handleEmailBlur}
-              error={errors.email}
-              icon={<Mail size={16} />}
-              autoComplete="email"
-              required
-            />
+            {!phoneAuth && (
+              <>
+                <Input
+                  id="reg-email"
+                  type="email"
+                  label="Email address"
+                  placeholder="you@example.com"
+                  value={form.email}
+                  onChange={(e) => {
+                    setForm((prev) => ({ ...prev, email: e.target.value }));
+                  }}
+                  onBlur={handleEmailBlur}
+                  error={errors.email}
+                  icon={<Mail size={16} />}
+                  autoComplete="email"
+                  required
+                />
 
-            <div className="grid grid-cols-2 gap-4">
-              <Input
-                id="reg-password"
-                type={showPwd ? 'text' : 'password'}
-                label="Password"
-                placeholder="Min 8 characters"
-                value={form.password}
-                onChange={(e) => setField('password', e.target.value)}
-                onBlur={validate}
-                error={errors.password}
-                icon={<Lock size={16} />}
-                iconRight={showPwd ? <EyeOff size={16} /> : <Eye size={16} />}
-                onIconRightClick={() => setShowPwd(!showPwd)}
-                autoComplete="new-password"
-                required
-              />
-              <Input
-                id="reg-confirm-password"
-                type={showPwd ? 'text' : 'password'}
-                label="Confirm Password"
-                placeholder="Repeat password"
-                value={form.confirmPassword}
-                onChange={(e) => setField('confirmPassword', e.target.value)}
-                onBlur={validate}
-                error={errors.confirmPassword}
-                icon={<Lock size={16} />}
-                required
-              />
-            </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <Input
+                    id="reg-password"
+                    type={showPwd ? 'text' : 'password'}
+                    label="Password"
+                    placeholder="Min 8 characters"
+                    value={form.password}
+                    onChange={(e) => setField('password', e.target.value)}
+                    onBlur={validate}
+                    error={errors.password}
+                    icon={<Lock size={16} />}
+                    iconRight={showPwd ? <EyeOff size={16} /> : <Eye size={16} />}
+                    onIconRightClick={() => setShowPwd(!showPwd)}
+                    autoComplete="new-password"
+                    required
+                  />
+                  <Input
+                    id="reg-confirm-password"
+                    type={showPwd ? 'text' : 'password'}
+                    label="Confirm Password"
+                    placeholder="Repeat password"
+                    value={form.confirmPassword}
+                    onChange={(e) => setField('confirmPassword', e.target.value)}
+                    onBlur={validate}
+                    error={errors.confirmPassword}
+                    icon={<Lock size={16} />}
+                    required
+                  />
+                </div>
+              </>
+            )}
 
             <Input
               id="reg-phone"
@@ -268,6 +291,7 @@ export default function RegisterPage() {
               onBlur={validate}
               error={errors.phone}
               icon={<Phone size={16} />}
+              disabled={phoneAuth}
               required
             />
 

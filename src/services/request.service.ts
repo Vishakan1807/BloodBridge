@@ -47,9 +47,9 @@ export async function createRequest(
     patientName:        dto.patientName.trim(),
     requiredByDate:     dto.requiredByDate,
     notes:              dto.notes?.trim() || '',
-    status:             'registered',
-    campId:             null,
-    campName:           null,
+    status:             'verified',
+    campId:             'broadcast',
+    campName:           `Broadcast — ${broadcastDistrict || 'District'}`,
     matchedDonorUid:    null,
     matchedDonorName:   null,
     partialDonations:   [],
@@ -65,11 +65,11 @@ export async function createRequest(
   const wfEntryRef = push(ref(db, `workflow/${id}`));
   await set(wfEntryRef, {
     fromState: null,
-    toState:   'registered',
+    toState:   'verified',
     actorUid:  user.uid,
     actorName: user.displayName,
     actorRole: user.role,
-    note:      'Donation request created.',
+    note:      `Donation request created and auto-broadcast to ${broadcastDistrict || 'district'}.`,
     timestamp: now,
   });
 
@@ -122,9 +122,9 @@ export async function updateRequest(
   const current = await getRequest(id);
   if (!current) throw new Error('Request not found.');
 
-  // BR-03 Guardrail: Only REGISTERED state is editable by non-admin
-  if (current.status !== 'registered') {
-    throw new Error('Requests can only be edited while in REGISTERED state.');
+  // BR-03 Guardrail: Only VERIFIED or REGISTERED state is editable by non-admin
+  if (current.status !== 'registered' && current.status !== 'verified') {
+    throw new Error('Requests can only be edited while in REGISTERED or VERIFIED state.');
   }
 
   await update(ref(db, `requests/${id}`), {

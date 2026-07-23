@@ -6,6 +6,9 @@ import {
   signOut as firebaseSignOut,
   sendPasswordResetEmail,
   updateProfile,
+  RecaptchaVerifier,
+  signInWithPhoneNumber,
+  type ConfirmationResult,
   type UserCredential,
 } from 'firebase/auth';
 import { auth } from '@/core/config/firebase';
@@ -56,6 +59,48 @@ export async function signInWithGoogle(): Promise<{ credential: UserCredential; 
       city:        '',
       bloodGroup:  '', // Left empty so onboarding modal prompts them for their exact blood group
     });
+  }
+
+  return { credential, isNewUser };
+}
+
+// ── Phone Authentication ──────────────────────────────────────
+
+/**
+ * Initializes the RecaptchaVerifier.
+ * Must be called in a useEffect inside the component rendering the container.
+ */
+export function setupRecaptcha(containerId: string): RecaptchaVerifier {
+  return new RecaptchaVerifier(auth, containerId, {
+    size: 'invisible',
+  });
+}
+
+/**
+ * Sends an OTP to the given phone number.
+ */
+export async function sendPhoneOtp(
+  phoneNumber: string,
+  appVerifier: RecaptchaVerifier
+): Promise<ConfirmationResult> {
+  return signInWithPhoneNumber(auth, phoneNumber, appVerifier);
+}
+
+/**
+ * Verifies the OTP entered by the user.
+ */
+export async function verifyPhoneOtp(
+  confirmationResult: ConfirmationResult,
+  otp: string
+): Promise<{ credential: UserCredential; isNewUser: boolean }> {
+  const credential = await confirmationResult.confirm(otp);
+  const existingProfile = await getProfile(credential.user.uid);
+
+  let isNewUser = false;
+  if (!existingProfile) {
+    isNewUser = true;
+    // We do NOT create a profile here for Phone auth because we don't have
+    // their displayName yet. We will redirect them to a profile completion flow.
   }
 
   return { credential, isNewUser };

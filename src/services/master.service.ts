@@ -113,6 +113,13 @@ export async function bulkCreateCamps(
 
 // ── Hospitals Service ─────────────────────────────────────────
 
+export async function getCampsInDistrict(district: string): Promise<Camp[]> {
+  const snapshot = await get(ref(db, 'master/camps'));
+  if (!snapshot.exists()) return [];
+  const camps = Object.values(snapshot.val()) as Camp[];
+  return camps.filter((c) => c.isActive && c.city?.toLowerCase() === district.toLowerCase());
+}
+
 export function subscribeHospitals(callback: (hospitals: Hospital[]) => void): Unsubscribe {
   const hospitalsRef = ref(db, 'master/hospitals');
   return onValue(hospitalsRef, (snapshot) => {

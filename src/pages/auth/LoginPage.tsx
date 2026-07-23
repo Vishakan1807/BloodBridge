@@ -1,6 +1,6 @@
-import React, { useState, type FormEvent } from 'react';
+import React, { useState, useEffect, type FormEvent } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Mail, Lock, Eye, EyeOff, Droplets } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, Droplets, Phone } from 'lucide-react';
 import { useAuth } from '@/core/context/AuthContext';
 import { useToast } from '@/core/context/ToastContext';
 import { Input } from '@/components/ui/Input';
@@ -38,13 +38,43 @@ export default function LoginPage() {
 
   const from = (location.state as { from?: Location })?.from?.pathname ?? ROUTES.DASHBOARD;
 
+  const [loginMethod,   setLoginMethod]   = useState<'email' | 'phone'>('email');
+  
+  // Email State
   const [email,         setEmail]         = useState('');
   const [password,      setPassword]      = useState('');
   const [showPwd,       setShowPwd]       = useState(false);
-  const [loading,       setLoading]       = useState(false);
-  const [googleLoading, setGoogleLoading] = useState(false);
   const [emailErr,      setEmailErr]      = useState('');
   const [passwordErr,   setPasswordErr]   = useState('');
+
+  // Phone State
+  const [phoneNumber,   setPhoneNumber]   = useState('');
+  const [phoneErr,      setPhoneErr]      = useState('');
+  const [otp,           setOtp]           = useState('');
+  const [otpErr,        setOtpErr]        = useState('');
+  const [otpSent,       setOtpSent]       = useState(false);
+  const [confResult,    setConfResult]    = useState<any>(null);
+  const [appVerifier,   setAppVerifier]   = useState<any>(null);
+
+  const [loading,       setLoading]       = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+
+  // Setup reCAPTCHA for Phone Auth
+  useEffect(() => {
+    import('@/services/auth.service').then(({ setupRecaptcha }) => {
+      try {
+        if (!(window as any).recaptchaVerifier) {
+          const verifier = setupRecaptcha('recaptcha-container');
+          setAppVerifier(verifier);
+          (window as any).recaptchaVerifier = verifier;
+        } else {
+          setAppVerifier((window as any).recaptchaVerifier);
+        }
+      } catch (err) {
+        console.error('Recaptcha setup error:', err);
+      }
+    });
+  }, []);
 
   async function handleGoogleSignIn() {
     setGoogleLoading(true);
@@ -60,7 +90,7 @@ export default function LoginPage() {
   }
 
   // ── Validation ───────────────────────────────────────────────
-  function validate(): boolean {
+  function validateEmail(): boolean {
     let valid = true;
     if (!email) {
       setEmailErr('Email is required.'); valid = false;
@@ -80,10 +110,22 @@ export default function LoginPage() {
     return valid;
   }
 
-  // ── Submit ───────────────────────────────────────────────────
-  async function handleSubmit(e: FormEvent) {
+  function validatePhone(): boolean {
+    let valid = true;
+    if (!phoneNumber) {
+      setPhoneErr('Phone number is required.'); valid = false;
+    } else if (!/^\+\d{10,15}$/.test(phoneNumber)) {
+      setPhoneErr('Enter a valid number with country code (e.g. +919876543210).'); valid = false;
+    } else {
+      setPhoneErr('');
+    }
+    return valid;
+  }
+
+  // ── Submit Handlers ──────────────────────────────────────────
+  async function handleEmailSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!validate()) return;
+    if (!validateEmail()) return;
     setLoading(true);
     try {
       await signIn(email, password);
@@ -91,6 +133,50 @@ export default function LoginPage() {
     } catch (err: unknown) {
       const code = (err as { code?: string })?.code ?? '';
       showError(parseFirebaseError(code));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleSendOtp() {
+    if (!validatePhone()) return;
+    if (!appVerifier) {
+      showError('reCAPTCHA not initialized. Please refresh.');
+      return;
+    }
+    setLoading(true);
+    try {
+      const { sendPhoneOtp } = await import('@/services/auth.service');
+      const result = await sendPhoneOtp(phoneNumber, appVerifier);
+      setConfResult(result);
+      setOtpSent(true);
+      showSuccess('OTP sent successfully via SMS.');
+    } catch (err: any) {
+      showError(parseFirebaseError(err?.code || '') || 'Failed to send OTP.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleVerifyOtp() {
+    if (!otp || otp.length < 6) {
+      setOtpErr('Enter a valid 6-digit OTP.');
+      return;
+    }
+    setOtpErr('');
+    setLoading(true);
+    try {
+      const { verifyPhoneOtp } = await import('@/services/auth.service');
+      const { isNewUser } = await verifyPhoneOtp(confResult, otp);
+      if (isNewUser) {
+        showSuccess('Phone verified! Please complete your profile.');
+        navigate(ROUTES.REGISTER, { state: { phoneAuth: true, phoneNumber } });
+      } else {
+        showSuccess('Successfully signed in! 🩸');
+        navigate(from, { replace: true });
+      }
+    } catch (err: any) {
+      showError(parseFirebaseError(err?.code || '') || 'Invalid OTP.');
     } finally {
       setLoading(false);
     }
@@ -160,57 +246,143 @@ export default function LoginPage() {
             <p className="text-muted text-sm">Sign in to your BloodBridge account</p>
           </div>
 
-          <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-5">
-            <Input
-              id="login-email"
-              type="email"
-              label="Email address"
-              placeholder="you@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              onBlur={() => validate()}
-              error={emailErr}
-              icon={<Mail size={16} />}
-              autoComplete="email"
-              required
-            />
-
-            <Input
-              id="login-password"
-              type={showPwd ? 'text' : 'password'}
-              label="Password"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              onBlur={() => validate()}
-              error={passwordErr}
-              icon={<Lock size={16} />}
-              iconRight={showPwd ? <EyeOff size={16} /> : <Eye size={16} />}
-              onIconRightClick={() => setShowPwd(!showPwd)}
-              autoComplete="current-password"
-              required
-            />
-
-            <div className="flex justify-end">
-              <Link
-                to={ROUTES.FORGOT_PASSWORD}
-                className="text-sm text-brand-400 hover:text-brand-300 transition-colors"
-              >
-                Forgot password?
-              </Link>
-            </div>
-
-            <Button
-              id="login-submit"
-              type="submit"
-              variant="primary"
-              size="lg"
-              fullWidth
-              loading={loading}
+          <div className="flex gap-2 p-1 bg-surface-800 rounded-lg mb-6">
+            <button
+              type="button"
+              onClick={() => setLoginMethod('email')}
+              className={`flex-1 py-1.5 text-sm font-semibold rounded-md transition-all ${
+                loginMethod === 'email' ? 'bg-surface-700 text-white shadow-sm' : 'text-muted hover:text-slate-200'
+              }`}
             >
-              Sign In
-            </Button>
-          </form>
+              Email
+            </button>
+            <button
+              type="button"
+              onClick={() => setLoginMethod('phone')}
+              className={`flex-1 py-1.5 text-sm font-semibold rounded-md transition-all ${
+                loginMethod === 'phone' ? 'bg-surface-700 text-white shadow-sm' : 'text-muted hover:text-slate-200'
+              }`}
+            >
+              Phone Number
+            </button>
+          </div>
+
+          <div id="recaptcha-container"></div>
+
+          {loginMethod === 'email' ? (
+            <form onSubmit={handleEmailSubmit} noValidate className="flex flex-col gap-5">
+              <Input
+                id="login-email"
+                type="email"
+                label="Email address"
+                placeholder="you@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                onBlur={() => validateEmail()}
+                error={emailErr}
+                icon={<Mail size={16} />}
+                autoComplete="email"
+                required
+              />
+
+              <Input
+                id="login-password"
+                type={showPwd ? 'text' : 'password'}
+                label="Password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                onBlur={() => validateEmail()}
+                error={passwordErr}
+                icon={<Lock size={16} />}
+                iconRight={showPwd ? <EyeOff size={16} /> : <Eye size={16} />}
+                onIconRightClick={() => setShowPwd(!showPwd)}
+                autoComplete="current-password"
+                required
+              />
+
+              <div className="flex justify-end">
+                <Link
+                  to={ROUTES.FORGOT_PASSWORD}
+                  className="text-sm text-brand-400 hover:text-brand-300 transition-colors"
+                >
+                  Forgot password?
+                </Link>
+              </div>
+
+              <Button
+                id="login-submit"
+                type="submit"
+                variant="primary"
+                size="lg"
+                fullWidth
+                loading={loading}
+              >
+                Sign In
+              </Button>
+            </form>
+          ) : (
+            <div className="flex flex-col gap-5">
+              {!otpSent ? (
+                <>
+                  <Input
+                    id="login-phone"
+                    type="tel"
+                    label="Phone Number"
+                    placeholder="+919876543210"
+                    value={phoneNumber}
+                    onChange={(e) => setPhoneNumber(e.target.value)}
+                    onBlur={() => validatePhone()}
+                    error={phoneErr}
+                    icon={<Phone size={16} />}
+                    autoComplete="tel"
+                    required
+                  />
+                  <Button
+                    onClick={handleSendOtp}
+                    variant="primary"
+                    size="lg"
+                    fullWidth
+                    loading={loading}
+                  >
+                    Send OTP
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Input
+                    id="login-otp"
+                    type="text"
+                    label="Enter 6-digit OTP"
+                    placeholder="123456"
+                    value={otp}
+                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    error={otpErr}
+                    icon={<Lock size={16} />}
+                    required
+                  />
+                  <Button
+                    onClick={handleVerifyOtp}
+                    variant="primary"
+                    size="lg"
+                    fullWidth
+                    loading={loading}
+                  >
+                    Verify & Sign In
+                  </Button>
+                  <div className="text-center mt-2">
+                    <button 
+                      type="button" 
+                      onClick={() => setOtpSent(false)} 
+                      className="text-sm text-muted hover:text-white transition-colors"
+                    >
+                      Change Phone Number
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
 
           <div className="relative my-6 flex items-center justify-center">
             <div className="border-t border-surface-700/80 w-full" />

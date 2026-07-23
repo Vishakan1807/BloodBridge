@@ -25,7 +25,7 @@ export function WorkflowTimeline({ currentState }: WorkflowTimelineProps) {
 
         {WORKFLOW_STATES_ORDERED.map((state) => {
           const cfg = STATE_CONFIG[state];
-          const isCompleted = cfg.step < currentStep || (isClosedState && cfg.step === 5);
+          const isCompleted = cfg.step < currentStep || (isClosedState && cfg.step === WORKFLOW_STATES_ORDERED.length);
           const isCurrent = cfg.step === currentStep && !isClosedState;
 
           return (
