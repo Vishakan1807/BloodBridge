@@ -1,4 +1,4 @@
-import React, { forwardRef, type SelectHTMLAttributes } from 'react';
+import React, { forwardRef, useId, type SelectHTMLAttributes } from 'react';
 import { ChevronDown } from 'lucide-react';
 
 export interface SelectOption {
@@ -16,10 +16,11 @@ interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
 
 export const Select = forwardRef<HTMLSelectElement, SelectProps>(
   ({ label, options, error, hint, placeholder, id, className = '', ...props }, ref) => {
-    const selectId = id ?? `select-${Math.random().toString(36).slice(2)}`;
-    const errorId  = `${selectId}-error`;
-    const hintId   = `${selectId}-hint`;
-    const hasError = Boolean(error);
+    const defaultId = useId();
+    const selectId  = id ?? defaultId;
+    const errorId   = `${selectId}-error`;
+    const hintId    = `${selectId}-hint`;
+    const hasError  = Boolean(error);
 
     return (
       <div className="flex flex-col gap-1.5">

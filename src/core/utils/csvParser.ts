@@ -15,11 +15,15 @@ export function normalizeDistrict(rawDistrict: string): { district: string; isEx
     return { district: '', isExact: false };
   }
 
-  const clean = rawDistrict
-    .trim()
+  const trimmed = rawDistrict.trim();
+  const clean = trimmed
     .toLowerCase()
     .replace(/\s+(district|dt|dist)\b/g, '')
     .replace(/[^a-z0-9]/g, '');
+
+  if (!clean) {
+    return { district: '', isExact: false };
+  }
 
   // Exact match search
   for (const city of INDIAN_CITIES) {
@@ -53,15 +57,17 @@ export function normalizeDistrict(rawDistrict: string): { district: string; isEx
     return { district: aliasMap[clean], isExact: true };
   }
 
-  // Fuzzy substring match
-  for (const city of INDIAN_CITIES) {
-    const cityClean = city.toLowerCase().replace(/[^a-z0-9]/g, '');
-    if (cityClean.includes(clean) || clean.includes(cityClean)) {
-      return { district: city, isExact: false };
+  // Fuzzy match only if clean search term is at least 4 characters
+  if (clean.length >= 4) {
+    for (const city of INDIAN_CITIES) {
+      const cityClean = city.toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (cityClean.length >= 4 && (cityClean.includes(clean) || clean.includes(cityClean))) {
+        return { district: city, isExact: false };
+      }
     }
   }
 
-  return { district: rawDistrict.trim(), isExact: false };
+  return { district: trimmed, isExact: false };
 }
 
 // ── Robust CSV Delimiter Parser ──────────────────────────────
@@ -113,20 +119,20 @@ export function parseCSVRaw(csvContent: string): string[][] {
 // ── Parse Hospital Bulk Import CSV ────────────────────────────
 export function parseHospitalCSV(csvText: string): ParsedHospitalImportRow[] {
   const rawRows = parseCSVRaw(csvText);
-  if (rawRows.length === 0) return [];
+  if (rawRows.length <= 1) return [];
 
   const headers = rawRows[0].map((h) => h.toLowerCase().trim());
   const dataRows = rawRows.slice(1);
 
   // Column Index Detection
   let nameIdx = headers.findIndex((h) =>
-    ['hospital name', 'name', 'hospital', 'facility', 'institution'].includes(h),
+    ['hospital name', 'camp name', 'name', 'hospital', 'camp', 'facility', 'institution'].includes(h),
   );
   let districtIdx = headers.findIndex((h) =>
     ['district', 'city', 'location', 'district (main)', 'district name', 'state district'].includes(h),
   );
   let addressIdx = headers.findIndex((h) =>
-    ['address', 'hospital address', 'street', 'location address'].includes(h),
+    ['address', 'hospital address', 'camp address', 'street', 'location address'].includes(h),
   );
   let phoneIdx = headers.findIndex((h) =>
     [
@@ -140,46 +146,48 @@ export function parseHospitalCSV(csvText: string): ParsedHospitalImportRow[] {
     ].includes(h),
   );
 
-  // Fallbacks if headers not detected by exact names
+  // Default standard fallback index order: [Name, District, Address, Phone]
   if (nameIdx === -1) nameIdx = 0;
   if (districtIdx === -1) districtIdx = 1;
   if (addressIdx === -1) addressIdx = 2;
   if (phoneIdx === -1) phoneIdx = 3;
 
-  return dataRows.map((row) => {
-    const rawName = row[nameIdx] || '';
-    const rawDist = row[districtIdx] || '';
-    const rawAddr = row[addressIdx] || '';
-    const rawPhone = row[phoneIdx] || '';
+  return dataRows
+    .filter((row) => row.some((cell) => cell.trim().length > 0))
+    .map((row) => {
+      const rawName = row[nameIdx] || '';
+      const rawDist = row[districtIdx] || '';
+      const rawAddr = row[addressIdx] || '';
+      const rawPhone = row[phoneIdx] || '';
 
-    const name = rawName.trim();
-    const address = rawAddr.trim();
-    const phone = rawPhone.trim();
-    const { district, isExact } = normalizeDistrict(rawDist);
+      const name = rawName.trim();
+      const address = rawAddr.trim();
+      const phone = rawPhone.trim();
+      const { district, isExact } = normalizeDistrict(rawDist);
 
-    let status: 'valid' | 'warning' | 'error' = 'valid';
-    let statusMessage = 'Ready for import';
+      let status: 'valid' | 'warning' | 'error' = 'valid';
+      let statusMessage = 'Ready for import';
 
-    if (!name) {
-      status = 'error';
-      statusMessage = 'Hospital name is missing';
-    } else if (!district) {
-      status = 'error';
-      statusMessage = 'District (Tamil Nadu) is missing';
-    } else if (!isExact && !(INDIAN_CITIES as readonly string[]).includes(district)) {
-      status = 'warning';
-      statusMessage = `District "${rawDist}" mapped to best match. Please verify.`;
-    }
+      if (!name) {
+        status = 'error';
+        statusMessage = 'Name is missing';
+      } else if (!district) {
+        status = 'error';
+        statusMessage = 'District is missing';
+      } else if (!isExact && !(INDIAN_CITIES as readonly string[]).includes(district)) {
+        status = 'warning';
+        statusMessage = `District "${rawDist}" mapped to best match. Please verify.`;
+      }
 
-    return {
-      name,
-      district,
-      address,
-      phone,
-      status,
-      statusMessage,
-    };
-  });
+      return {
+        name,
+        district,
+        address,
+        phone,
+        status,
+        statusMessage,
+      };
+    });
 }
 
 // ── Download Sample CSV Template Helper ───────────────────────

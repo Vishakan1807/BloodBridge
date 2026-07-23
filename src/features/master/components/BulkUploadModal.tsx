@@ -51,7 +51,8 @@ export function BulkUploadModal({
   }, [isOpen]);
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
+    const inputTarget = e.target;
+    const file = inputTarget.files?.[0];
     if (!file) return;
 
     setFileName(file.name);
@@ -59,6 +60,8 @@ export function BulkUploadModal({
 
     reader.onload = (evt) => {
       const text = evt.target?.result as string;
+      inputTarget.value = '';
+
       if (!text) {
         showError('Selected file is empty.');
         return;
@@ -70,12 +73,11 @@ export function BulkUploadModal({
         return;
       }
       setParsedRows(rows);
-      if (e.target) e.target.value = '';
     };
 
     reader.onerror = () => {
+      inputTarget.value = '';
       showError('Failed to read uploaded file.');
-      if (e.target) e.target.value = '';
     };
 
     reader.readAsText(file);
