@@ -10,6 +10,9 @@ export default defineConfig({
   ],
   server: {
     host: 'localhost',
+    headers: {
+      'Cross-Origin-Opener-Policy': 'same-origin-allow-popups',
+    },
   },
   resolve: {
     alias: {

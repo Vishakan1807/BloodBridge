@@ -10,17 +10,27 @@ import { ROUTES } from '@/core/constants/routes';
 
 function parseFirebaseError(code: string): string {
   const map: Record<string, string> = {
-    'auth/user-not-found':         'No account found with this email address. Please register first to access BloodBridge.',
-    'auth/invalid-credential':     'No account found with these credentials. Please check your email or register first.',
-    'auth/wrong-password':         'Incorrect password. Please check your password or click "Forgot password".',
-    'auth/user-disabled':          'Your account has been disabled. Please contact support@bloodbridge.org.',
-    'auth/too-many-requests':      'Too many failed sign-in attempts. Please try again in a few minutes.',
-    'auth/network-request-failed': 'Network connection error. Please check your internet connection.',
-    'auth/unauthorized-domain':    'Google Sign-In Domain Error: Please add your domain (e.g. localhost or vercel app URL) in Firebase Console -> Authentication -> Settings -> Authorized domains.',
-    'auth/popup-closed-by-user':   'Google Sign-In popup was closed before completing.',
-    'auth/popup-blocked':          'Google Sign-In popup was blocked by your browser settings.',
+    'auth/user-not-found':            'No account found with this email address. Please register first to access BloodBridge.',
+    'auth/invalid-credential':        'No account found with these credentials. Please check your email or register first.',
+    'auth/wrong-password':            'Incorrect password. Please check your password or click "Forgot password".',
+    'auth/user-disabled':             'Your account has been disabled. Please contact support@bloodbridge.org.',
+    'auth/too-many-requests':         'Too many failed sign-in attempts. Please try again in a few minutes.',
+    'auth/network-request-failed':    'Network connection error. Please check your internet connection.',
+    'auth/unauthorized-domain':       'Domain not authorized in Firebase Console.',
+    'auth/popup-closed-by-user':      'Sign-In popup was closed before completing.',
+    'auth/popup-blocked':             'Sign-In popup was blocked by your browser settings.',
+    'auth/invalid-phone-number':      'Invalid phone number format. Please include country code (e.g., +91).',
+    'auth/invalid-verification-code': 'The OTP entered is incorrect or has expired.',
+    'auth/missing-verification-code': 'Please enter the 6-digit OTP.',
+    'auth/quota-exceeded':            'SMS quota exceeded. Please try again later or use email sign-in.',
+    'auth/billing-not-enabled':       'Phone authentication requires Firebase Billing to be enabled. Please check console.',
+    'auth/operation-not-allowed':     'SMS sending is blocked for this region. Please enable the region in Firebase Console -> Authentication -> Settings -> SMS Region Policy.',
+    'auth/invalid-app-credential':    'reCAPTCHA verification failed. If testing locally, use a test number or deploy to a live URL.',
   };
-  return map[code] ?? 'Unable to sign in with Google. Please try again or use email sign in.';
+  
+  console.error('[Firebase Error Code]:', code);
+  
+  return map[code] ?? 'Authentication failed. Please verify your details and try again.';
 }
 
 // ── Highlights for the hero panel ──────────────────────────────
@@ -54,27 +64,9 @@ export default function LoginPage() {
   const [otpErr,        setOtpErr]        = useState('');
   const [otpSent,       setOtpSent]       = useState(false);
   const [confResult,    setConfResult]    = useState<any>(null);
-  const [appVerifier,   setAppVerifier]   = useState<any>(null);
 
   const [loading,       setLoading]       = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
-
-  // Setup reCAPTCHA for Phone Auth
-  useEffect(() => {
-    import('@/services/auth.service').then(({ setupRecaptcha }) => {
-      try {
-        if (!(window as any).recaptchaVerifier) {
-          const verifier = setupRecaptcha('recaptcha-container');
-          setAppVerifier(verifier);
-          (window as any).recaptchaVerifier = verifier;
-        } else {
-          setAppVerifier((window as any).recaptchaVerifier);
-        }
-      } catch (err) {
-        console.error('Recaptcha setup error:', err);
-      }
-    });
-  }, []);
 
   async function handleGoogleSignIn() {
     setGoogleLoading(true);
@@ -140,18 +132,25 @@ export default function LoginPage() {
 
   async function handleSendOtp() {
     if (!validatePhone()) return;
-    if (!appVerifier) {
-      showError('reCAPTCHA not initialized. Please refresh.');
-      return;
-    }
+    
     setLoading(true);
     try {
-      const { sendPhoneOtp } = await import('@/services/auth.service');
-      const result = await sendPhoneOtp(phoneNumber, appVerifier);
+      const { setupRecaptcha, sendPhoneOtp } = await import('@/services/auth.service');
+      
+      // Clear old verifier to avoid detached DOM element errors in React
+      if ((window as any).recaptchaVerifier) {
+        try { (window as any).recaptchaVerifier.clear(); } catch {}
+      }
+      
+      const verifier = setupRecaptcha('recaptcha-container');
+      (window as any).recaptchaVerifier = verifier;
+
+      const result = await sendPhoneOtp(phoneNumber, verifier);
       setConfResult(result);
       setOtpSent(true);
       showSuccess('OTP sent successfully via SMS.');
     } catch (err: any) {
+      console.error('[Full Phone Auth Error]:', err);
       showError(parseFirebaseError(err?.code || '') || 'Failed to send OTP.');
     } finally {
       setLoading(false);
@@ -170,7 +169,8 @@ export default function LoginPage() {
       const { isNewUser } = await verifyPhoneOtp(confResult, otp);
       if (isNewUser) {
         showSuccess('Phone verified! Please complete your profile.');
-        navigate(ROUTES.REGISTER, { state: { phoneAuth: true, phoneNumber } });
+        // We now route to the dashboard, and the CompleteProfileModal will float on top!
+        navigate(from, { replace: true });
       } else {
         showSuccess('Successfully signed in! 🩸');
         navigate(from, { replace: true });
@@ -246,12 +246,19 @@ export default function LoginPage() {
             <p className="text-muted text-sm">Sign in to your BloodBridge account</p>
           </div>
 
-          <div className="flex gap-2 p-1 bg-surface-800 rounded-lg mb-6">
+          <div className="relative flex p-1.5 bg-surface-950/40 backdrop-blur-xl rounded-2xl mb-8 ring-1 ring-white/10 shadow-[inset_0_2px_4px_rgba(0,0,0,0.4)]">
+            {/* Animated Background Pill */}
+            <div
+              className={`absolute top-1.5 bottom-1.5 w-[calc(50%-6px)] bg-gradient-to-r from-brand-600 to-brand-500 rounded-xl shadow-lg shadow-brand-500/30 transition-all duration-500 cubic-bezier(0.4, 0, 0.2, 1) ${
+                loginMethod === 'email' ? 'left-1.5' : 'left-[calc(50%+4.5px)]'
+              }`}
+            />
+            
             <button
               type="button"
               onClick={() => setLoginMethod('email')}
-              className={`flex-1 py-1.5 text-sm font-semibold rounded-md transition-all ${
-                loginMethod === 'email' ? 'bg-surface-700 text-white shadow-sm' : 'text-muted hover:text-slate-200'
+              className={`relative flex-1 py-2.5 text-sm font-bold tracking-wide rounded-xl cursor-pointer transition-colors duration-300 z-10 ${
+                loginMethod === 'email' ? 'text-white text-shadow-sm' : 'text-slate-400 hover:text-slate-200'
               }`}
             >
               Email
@@ -259,8 +266,8 @@ export default function LoginPage() {
             <button
               type="button"
               onClick={() => setLoginMethod('phone')}
-              className={`flex-1 py-1.5 text-sm font-semibold rounded-md transition-all ${
-                loginMethod === 'phone' ? 'bg-surface-700 text-white shadow-sm' : 'text-muted hover:text-slate-200'
+              className={`relative flex-1 py-2.5 text-sm font-bold tracking-wide rounded-xl cursor-pointer transition-colors duration-300 z-10 ${
+                loginMethod === 'phone' ? 'text-white text-shadow-sm' : 'text-slate-400 hover:text-slate-200'
               }`}
             >
               Phone Number

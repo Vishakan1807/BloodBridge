@@ -27,16 +27,17 @@ export function CompleteProfileModal() {
       return;
     }
 
-    // Check if user authenticated via Google provider!
+    // Check if user authenticated via Google or Phone
     const isGoogleUser = currentUser.providerData.some((p) => p.providerId === 'google.com');
+    const isPhoneUser = currentUser.providerData.some((p) => p.providerId === 'phone');
 
-    // ONLY show modal if it is a Google OAuth user AND details are missing!
-    const needsCompletion = isGoogleUser && (!userProfile.city || !userProfile.bloodGroup || !userProfile.phone);
+    // Show modal if it's OAuth or Phone and details are missing!
+    const needsCompletion = (isGoogleUser || isPhoneUser) && (!userProfile.city || !userProfile.bloodGroup || !userProfile.phone);
 
     if (needsCompletion) {
       setBloodGroup(userProfile.bloodGroup || '');
       setDistrict(userProfile.city || '');
-      setPhone(userProfile.phone || '');
+      setPhone(userProfile.phone || currentUser.phoneNumber || '');
       setIsOpen(true);
     } else {
       setIsOpen(false);
