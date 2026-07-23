@@ -2,6 +2,8 @@ import React, { useEffect, type ReactNode } from 'react';
 import { X } from 'lucide-react';
 import { Button } from './Button';
 
+import { createPortal } from 'react-dom';
+
 type ModalSize = 'sm' | 'md' | 'lg' | 'xl' | 'fullscreen';
 
 interface ModalProps {
@@ -45,7 +47,7 @@ export function Modal({
 
   if (!isOpen) return null;
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
       role="dialog"
@@ -64,7 +66,6 @@ export function Modal({
         className={[
           'relative w-full bg-surface-800 rounded-xl border border-surface-600/60',
           'shadow-modal flex flex-col max-h-[90vh]',
-          'animate-[scale-in_0.15s_ease-out]',
           sizeClasses[size],
         ].join(' ')}
         style={{
@@ -99,7 +100,8 @@ export function Modal({
           to   { opacity: 1; transform: scale(1)    translateY(0); }
         }
       `}</style>
-    </div>
+    </div>,
+    document.body
   );
 }
 
