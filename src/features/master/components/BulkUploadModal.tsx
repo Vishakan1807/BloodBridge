@@ -1,11 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Upload, Download, FileSpreadsheet, CheckCircle2, AlertTriangle, XCircle, Trash2, ShieldCheck } from 'lucide-react';
+import { Upload, Download, FileSpreadsheet, CheckCircle2, AlertTriangle, XCircle, Trash2, ShieldCheck, Loader2 } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Select } from '@/components/ui/Select';
 import { CITY_OPTIONS } from '@/core/constants/indianCities';
 import {
-  parseHospitalCSV,
+  parseSpreadsheetFile,
   downloadHospitalCSVTemplate,
   type ParsedHospitalImportRow,
 } from '@/core/utils/csvParser';
@@ -32,7 +32,9 @@ export function BulkUploadModal({
 
   const [parsedRows, setParsedRows] = useState<ParsedHospitalImportRow[]>([]);
   const [fileName, setFileName] = useState('');
+  const [parsing, setParsing] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
 
   const isCamp = entityType === 'camp';
   const entityLabel = isCamp ? 'Blood Bank / Camp' : 'Hospital';
@@ -43,44 +45,54 @@ export function BulkUploadModal({
     if (!isOpen) {
       setParsedRows([]);
       setFileName('');
+      setParsing(false);
       setImporting(false);
+      setIsDragging(false);
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
     }
   }, [isOpen]);
 
-  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const inputTarget = e.target;
-    const file = inputTarget.files?.[0];
+  async function processSelectedFile(file: File) {
     if (!file) return;
 
     setFileName(file.name);
-    const reader = new FileReader();
-
-    reader.onload = (evt) => {
-      const text = evt.target?.result as string;
-      inputTarget.value = '';
-
-      if (!text) {
-        showError('Selected file is empty.');
-        return;
-      }
-
-      const rows = parseHospitalCSV(text);
+    setParsing(true);
+    try {
+      const rows = await parseSpreadsheetFile(file);
       if (rows.length === 0) {
-        showError('No valid data rows found in the uploaded file.');
+        showError('No valid data rows found in the uploaded file. Please verify columns.');
+        setParsedRows([]);
         return;
       }
       setParsedRows(rows);
-    };
+      showSuccess(`Successfully parsed ${rows.length} rows from ${file.name}`);
+    } catch (err: any) {
+      showError(err?.message || 'Failed to read spreadsheet file.');
+      setParsedRows([]);
+    } finally {
+      setParsing(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  }
 
-    reader.onerror = () => {
-      inputTarget.value = '';
-      showError('Failed to read uploaded file.');
-    };
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (file) {
+      processSelectedFile(file);
+    }
+  }
 
-    reader.readAsText(file);
+  function handleDrop(e: React.DragEvent<HTMLDivElement>) {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      processSelectedFile(file);
+    }
   }
 
   function handleUpdateRow(index: number, field: keyof ParsedHospitalImportRow, value: string) {
@@ -173,7 +185,7 @@ export function BulkUploadModal({
               <FileSpreadsheet size={16} className="text-brand-400" /> Excel & CSV Bulk Data Upload
             </p>
             <p className="mt-0.5">
-              Upload an Excel (.csv) sheet containing {entityLabel} Name, District (Tamil Nadu), Address, and Contact Phone.
+              Upload an Excel (.xlsx, .xls, .csv) sheet containing {entityLabel} Name, District (Tamil Nadu), Address, and Contact Phone.
             </p>
           </div>
 
@@ -187,7 +199,22 @@ export function BulkUploadModal({
         </div>
 
         {/* Upload File Zone */}
-        <div className="border-2 border-dashed border-surface-600 rounded-xl p-6 text-center hover:border-brand-500/60 transition-colors bg-surface-800/40">
+        <div
+          onClick={() => fileInputRef.current?.click()}
+          onDragOver={(e) => {
+            e.preventDefault();
+            setIsDragging(true);
+          }}
+          onDragLeave={() => setIsDragging(false)}
+          onDrop={handleDrop}
+          className={`
+            border-2 border-dashed rounded-xl p-6 text-center transition-all cursor-pointer select-none
+            ${isDragging
+              ? 'border-brand-400 bg-brand-500/10 scale-[1.01]'
+              : 'border-surface-600 hover:border-brand-500/60 bg-surface-800/40 hover:bg-surface-800/70'
+            }
+          `}
+        >
           <input
             ref={fileInputRef}
             type="file"
@@ -196,28 +223,36 @@ export function BulkUploadModal({
             className="hidden"
           />
 
-          <Upload size={32} className="mx-auto text-brand-400 mb-2" />
-          <p className="text-sm font-semibold text-white">
-            {fileName ? `Loaded: ${fileName}` : 'Click to browse or drag & drop your Excel / CSV file'}
-          </p>
-          <p className="text-xs text-muted mt-1">
-            Supports CSV files exported from Excel, Google Sheets, or Numbers
-          </p>
+          {parsing ? (
+            <div className="py-2 flex flex-col items-center">
+              <Loader2 size={32} className="text-brand-400 animate-spin mb-2" />
+              <p className="text-sm font-semibold text-white">Parsing spreadsheet data...</p>
+            </div>
+          ) : (
+            <>
+              <Upload size={32} className="mx-auto text-brand-400 mb-2" />
+              <p className="text-sm font-semibold text-white">
+                {fileName ? `Loaded File: ${fileName}` : 'Click anywhere inside to select or Drag & Drop Excel / CSV file'}
+              </p>
+              <p className="text-xs text-muted mt-1">
+                Supports Excel (.xlsx, .xls), CSV, or TSV formats
+              </p>
 
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="mt-3"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            Select Spreadsheet File
-          </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="mt-3 pointer-events-none"
+              >
+                {fileName ? 'Change File' : 'Select Spreadsheet File'}
+              </Button>
+            </>
+          )}
         </div>
 
         {/* Real-time Preview Table */}
         {parsedRows.length > 0 && (
-          <div className="space-y-3">
+          <div className="space-y-3 animate-in fade-in duration-200">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
                 <span>Data Preview ({parsedRows.length} Rows Extracted)</span>
@@ -237,7 +272,7 @@ export function BulkUploadModal({
                 <thead className="sticky top-0 bg-surface-800 border-b border-surface-700 text-muted uppercase tracking-wider">
                   <tr>
                     <th className="py-2.5 px-3">#</th>
-                    <th className="py-2.5 px-3">Hospital Name *</th>
+                    <th className="py-2.5 px-3">{entityLabel} Name *</th>
                     <th className="py-2.5 px-3">District (Tamil Nadu) *</th>
                     <th className="py-2.5 px-3">Address</th>
                     <th className="py-2.5 px-3">Contact Phone</th>
@@ -247,7 +282,7 @@ export function BulkUploadModal({
                 </thead>
                 <tbody className="divide-y divide-surface-700/60 bg-surface-900/60">
                   {parsedRows.map((row, idx) => (
-                    <tr key={idx} className="hover:bg-surface-700/30">
+                    <tr key={`import-row-${idx}`} className="hover:bg-surface-700/30">
                       <td className="py-2 px-3 text-muted font-mono">{idx + 1}</td>
 
                       <td className="py-2 px-3">
@@ -255,13 +290,14 @@ export function BulkUploadModal({
                           type="text"
                           value={row.name}
                           onChange={(e) => handleUpdateRow(idx, 'name', e.target.value)}
-                          placeholder="Hospital Name"
+                          placeholder={`${entityLabel} Name`}
                           className="w-full bg-surface-800 border border-surface-600 rounded px-2 py-1 text-white focus:outline-none focus:border-brand-500"
                         />
                       </td>
 
                       <td className="py-2 px-3">
                         <Select
+                          id={`district-select-${idx}`}
                           options={[
                             { value: '', label: 'Select District...' },
                             ...CITY_OPTIONS,
@@ -328,7 +364,7 @@ export function BulkUploadModal({
         {/* Footer Actions */}
         <div className="flex items-center justify-between pt-4 border-t border-surface-700">
           <p className="text-xs text-muted">
-            {validCount > 0 ? `${validCount} hospitals ready to be created in Firebase DB` : 'Upload a CSV file to preview'}
+            {validCount > 0 ? `${validCount} ${entityLabelPlural} ready to be created in Firebase DB` : 'Upload a CSV/Excel file to preview'}
           </p>
 
           <div className="flex gap-3">

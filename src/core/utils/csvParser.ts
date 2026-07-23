@@ -1,3 +1,4 @@
+import * as XLSX from 'xlsx';
 import { INDIAN_CITIES } from '@/core/constants/indianCities';
 
 export interface ParsedHospitalImportRow {
@@ -57,7 +58,7 @@ export function normalizeDistrict(rawDistrict: string): { district: string; isEx
     return { district: aliasMap[clean], isExact: true };
   }
 
-  // Fuzzy match only if clean search term is at least 4 characters
+  // Substring match only if clean search term is at least 4 characters
   if (clean.length >= 4) {
     for (const city of INDIAN_CITIES) {
       const cityClean = city.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -70,124 +71,111 @@ export function normalizeDistrict(rawDistrict: string): { district: string; isEx
   return { district: trimmed, isExact: false };
 }
 
-// ── Robust CSV Delimiter Parser ──────────────────────────────
-export function parseCSVRaw(csvContent: string): string[][] {
-  const lines: string[][] = [];
-  let currentRow: string[] = [];
-  let currentVal = '';
-  let inQuotes = false;
+// ── Universal Spreadsheet & CSV Parser using XLSX ─────────────
+export async function parseSpreadsheetFile(file: File): Promise<ParsedHospitalImportRow[]> {
+  const data = await file.arrayBuffer();
+  const workbook = XLSX.read(data, { type: 'array' });
 
-  for (let i = 0; i < csvContent.length; i++) {
-    const char = csvContent[i];
-    const nextChar = csvContent[i + 1];
+  const firstSheetName = workbook.SheetNames[0];
+  if (!firstSheetName) return [];
 
-    if (char === '"') {
-      if (inQuotes && nextChar === '"') {
-        currentVal += '"';
-        i++;
-      } else {
-        inQuotes = !inQuotes;
-      }
-    } else if ((char === ',' || char === '\t' || char === ';') && !inQuotes) {
-      currentRow.push(currentVal.trim());
-      currentVal = '';
-    } else if ((char === '\r' || char === '\n') && !inQuotes) {
-      if (char === '\r' && nextChar === '\n') {
-        i++;
-      }
-      currentRow.push(currentVal.trim());
-      if (currentRow.some((col) => col.length > 0)) {
-        lines.push(currentRow);
-      }
-      currentRow = [];
-      currentVal = '';
-    } else {
-      currentVal += char;
-    }
-  }
+  const worksheet = workbook.Sheets[firstSheetName];
+  // Parse into 2D string matrix
+  const matrix = XLSX.utils.sheet_to_json<string[]>(worksheet, { header: 1, raw: false, defval: '' });
 
-  if (currentVal.length > 0 || currentRow.length > 0) {
-    currentRow.push(currentVal.trim());
-    if (currentRow.some((col) => col.length > 0)) {
-      lines.push(currentRow);
-    }
-  }
+  const cleanMatrix: string[][] = matrix
+    .map((row) => (Array.isArray(row) ? row.map((cell) => String(cell || '').trim()) : []))
+    .filter((row) => row.some((cell) => cell.length > 0));
 
-  return lines;
+  if (cleanMatrix.length === 0) return [];
+
+  return processMatrixToHospitalRows(cleanMatrix);
 }
 
-// ── Parse Hospital Bulk Import CSV ────────────────────────────
-export function parseHospitalCSV(csvText: string): ParsedHospitalImportRow[] {
-  const rawRows = parseCSVRaw(csvText);
-  if (rawRows.length <= 1) return [];
+export function processMatrixToHospitalRows(rawRows: string[][]): ParsedHospitalImportRow[] {
+  if (rawRows.length === 0) return [];
 
-  const headers = rawRows[0].map((h) => h.toLowerCase().trim());
-  const dataRows = rawRows.slice(1);
-
-  // Column Index Detection
-  let nameIdx = headers.findIndex((h) =>
-    ['hospital name', 'camp name', 'name', 'hospital', 'camp', 'facility', 'institution'].includes(h),
-  );
-  let districtIdx = headers.findIndex((h) =>
-    ['district', 'city', 'location', 'district (main)', 'district name', 'state district'].includes(h),
-  );
-  let addressIdx = headers.findIndex((h) =>
-    ['address', 'hospital address', 'camp address', 'street', 'location address'].includes(h),
-  );
-  let phoneIdx = headers.findIndex((h) =>
-    [
-      'contact number',
-      'contact',
-      'phone',
-      'phone number',
-      'mobile',
-      'landline',
-      'contact no',
-    ].includes(h),
+  // Determine if Row 0 is Header
+  const firstRowLower = rawRows[0].map((c) => c.toLowerCase());
+  const hasHeaderKeywords = firstRowLower.some((h) =>
+    ['hospital', 'camp', 'name', 'district', 'city', 'location', 'address', 'phone', 'contact'].some((kw) =>
+      h.includes(kw),
+    ),
   );
 
-  // Default standard fallback index order: [Name, District, Address, Phone]
+  let nameIdx = -1;
+  let districtIdx = -1;
+  let addressIdx = -1;
+  let phoneIdx = -1;
+
+  let dataRows: string[][] = [];
+
+  if (hasHeaderKeywords) {
+    nameIdx = firstRowLower.findIndex((h) =>
+      ['hospital name', 'camp name', 'name', 'hospital', 'camp', 'facility', 'institution'].includes(h),
+    );
+    districtIdx = firstRowLower.findIndex((h) =>
+      ['district', 'city', 'location', 'district (main)', 'district name', 'state district'].includes(h),
+    );
+    addressIdx = firstRowLower.findIndex((h) =>
+      ['address', 'hospital address', 'camp address', 'street', 'location address'].includes(h),
+    );
+    phoneIdx = firstRowLower.findIndex((h) =>
+      [
+        'contact number',
+        'contact',
+        'phone',
+        'phone number',
+        'mobile',
+        'landline',
+        'contact no',
+      ].includes(h),
+    );
+    dataRows = rawRows.slice(1);
+  } else {
+    dataRows = rawRows;
+  }
+
+  // Fallbacks if not uniquely identified
   if (nameIdx === -1) nameIdx = 0;
   if (districtIdx === -1) districtIdx = 1;
   if (addressIdx === -1) addressIdx = 2;
   if (phoneIdx === -1) phoneIdx = 3;
 
-  return dataRows
-    .filter((row) => row.some((cell) => cell.trim().length > 0))
-    .map((row) => {
-      const rawName = row[nameIdx] || '';
-      const rawDist = row[districtIdx] || '';
-      const rawAddr = row[addressIdx] || '';
-      const rawPhone = row[phoneIdx] || '';
+  return dataRows.map((row) => {
+    const rawName = row[nameIdx] || '';
+    const rawDist = row[districtIdx] || '';
+    const rawAddr = row[addressIdx] || '';
+    const rawPhone = row[phoneIdx] || '';
 
-      const name = rawName.trim();
-      const address = rawAddr.trim();
-      const phone = rawPhone.trim();
-      const { district, isExact } = normalizeDistrict(rawDist);
+    const name = rawName.trim();
+    const address = rawAddr.trim();
+    const phone = rawPhone.trim();
+    const { district, isExact } = normalizeDistrict(rawDist);
 
-      let status: 'valid' | 'warning' | 'error' = 'valid';
-      let statusMessage = 'Ready for import';
+    let status: 'valid' | 'warning' | 'error' = 'valid';
+    let statusMessage = 'Ready for import';
 
-      if (!name) {
-        status = 'error';
-        statusMessage = 'Name is missing';
-      } else if (!district) {
-        status = 'error';
-        statusMessage = 'District is missing';
-      } else if (!isExact && !(INDIAN_CITIES as readonly string[]).includes(district)) {
-        status = 'warning';
-        statusMessage = `District "${rawDist}" mapped to best match. Please verify.`;
-      }
+    if (!name) {
+      status = 'error';
+      statusMessage = 'Name is missing';
+    } else if (!district) {
+      status = 'error';
+      statusMessage = 'District is missing';
+    } else if (!isExact && !(INDIAN_CITIES as readonly string[]).includes(district)) {
+      status = 'warning';
+      statusMessage = `District "${rawDist}" mapped to best match. Please verify.`;
+    }
 
-      return {
-        name,
-        district,
-        address,
-        phone,
-        status,
-        statusMessage,
-      };
-    });
+    return {
+      name,
+      district,
+      address,
+      phone,
+      status,
+      statusMessage,
+    };
+  });
 }
 
 // ── Download Sample CSV Template Helper ───────────────────────
