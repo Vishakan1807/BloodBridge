@@ -182,18 +182,16 @@ export function Sidebar({ isOpen, isCollapsed, onClose, onToggleCollapse }: Side
                 <p className="text-xs text-muted">{roleLabel}</p>
               </div>
             )}
-            {!isCollapsed && (
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => setShowConfirmLogout(true)}
-                  className="text-muted hover:text-danger transition-colors p-1 rounded-md hover:bg-surface-700 cursor-pointer"
-                  aria-label="Sign out"
-                  title="Sign out"
-                >
-                  <LogOut size={16} />
-                </button>
-              </div>
-            )}
+            <div className="flex items-center gap-1 mt-1 lg:mt-0">
+              <button
+                onClick={() => setShowConfirmLogout(true)}
+                className="text-muted hover:text-danger transition-colors p-1 rounded-md hover:bg-surface-700 cursor-pointer"
+                aria-label="Sign out"
+                title="Sign out"
+              >
+                <LogOut size={16} />
+              </button>
+            </div>
           </div>
 
           {/* Collapse toggle */}
