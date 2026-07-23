@@ -14,13 +14,14 @@ export function CompleteProfileModal() {
   const { currentUser, userProfile, refreshProfile } = useAuth();
   const { showSuccess, showError }                  = useToast();
 
-  const [isOpen, setIsOpen]         = useState(false);
-  const [bloodGroup, setBloodGroup] = useState('');
-  const [district, setDistrict]     = useState('');
-  const [phone, setPhone]           = useState('');
-  const [saving, setSaving]         = useState(false);
+  const [isOpen, setIsOpen]               = useState(false);
+  const [displayName, setDisplayName]     = useState('');
+  const [bloodGroup, setBloodGroup]       = useState('');
+  const [district, setDistrict]           = useState('');
+  const [phone, setPhone]                 = useState('');
+  const [saving, setSaving]               = useState(false);
 
-  // Trigger modal ONLY for Google Sign-In users who have missing bloodGroup, city, or phone
+  // Trigger modal ONLY for Google Sign-In users or Phone users who have missing details
   useEffect(() => {
     if (!userProfile || !currentUser) {
       setIsOpen(false);
@@ -32,9 +33,11 @@ export function CompleteProfileModal() {
     const isPhoneUser = currentUser.providerData.some((p) => p.providerId === 'phone');
 
     // Show modal if it's OAuth or Phone and details are missing!
-    const needsCompletion = (isGoogleUser || isPhoneUser) && (!userProfile.city || !userProfile.bloodGroup || !userProfile.phone);
+    const isMissingName = !userProfile.displayName || userProfile.displayName === 'User' || userProfile.displayName.startsWith('+');
+    const needsCompletion = (isGoogleUser || isPhoneUser) && (isMissingName || !userProfile.city || !userProfile.bloodGroup || !userProfile.phone);
 
     if (needsCompletion) {
+      setDisplayName(isMissingName ? '' : userProfile.displayName);
       setBloodGroup(userProfile.bloodGroup || '');
       setDistrict(userProfile.city || '');
       setPhone(userProfile.phone || currentUser.phoneNumber || '');
@@ -60,6 +63,10 @@ export function CompleteProfileModal() {
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     if (!userProfile?.uid) return;
+    if (!displayName.trim()) {
+      showError('Please enter your full name.');
+      return;
+    }
     if (!bloodGroup) {
       showError('Please select your blood group.');
       return;
@@ -76,6 +83,7 @@ export function CompleteProfileModal() {
     setSaving(true);
     try {
       await updateUserProfile(userProfile.uid, {
+        displayName: displayName.trim(),
         bloodGroup,
         city: district.trim(),
         phone: phone.trim(),
@@ -104,9 +112,17 @@ export function CompleteProfileModal() {
             <Droplets size={16} /> Welcome to BloodBridge!
           </div>
           <p className="text-xs text-slate-300">
-            Please configure your <strong>Blood Group</strong>, <strong>Tamil Nadu District</strong>, and <strong>Phone Number</strong> so local hospitals and patients can connect with you during emergencies.
+            Please configure your <strong>Name</strong>, <strong>Blood Group</strong>, <strong>District</strong>, and <strong>Phone Number</strong> so local hospitals and patients can connect with you during emergencies.
           </p>
         </div>
+
+        <Input
+          label="Full Name"
+          placeholder="e.g. Alice Sharma"
+          value={displayName}
+          onChange={(e) => setDisplayName(e.target.value)}
+          required
+        />
 
         <Select
           label="Your Blood Group"
