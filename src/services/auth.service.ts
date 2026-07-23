@@ -99,8 +99,12 @@ export async function verifyPhoneOtp(
   let isNewUser = false;
   if (!existingProfile) {
     isNewUser = true;
-    // We do NOT create a profile here for Phone auth because we don't have
-    // their displayName yet. We will redirect them to a profile completion flow.
+    await createProfile(credential.user.uid, credential.user.email || '', {
+      displayName: credential.user.displayName || credential.user.phoneNumber || 'User',
+      phone:       credential.user.phoneNumber || '',
+      city:        '',
+      bloodGroup:  '', // Left empty so CompleteProfileModal prompts them
+    });
   }
 
   return { credential, isNewUser };
