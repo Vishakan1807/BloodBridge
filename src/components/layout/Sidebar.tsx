@@ -4,7 +4,7 @@ import {
   LayoutDashboard, ClipboardList, ShieldCheck, Target,
   Droplet, Building2, Hospital, BarChart3, PieChart, Activity,
   Users, KeyRound, ScrollText, Settings, Droplets,
-  ChevronLeft, ChevronRight, LogOut,
+  ChevronLeft, ChevronRight, LogOut, Tent,
 } from 'lucide-react';
 import { useAuth } from '@/core/context/AuthContext';
 import { useRBAC } from '@/core/context/RBACContext';
@@ -44,6 +44,7 @@ const NAV_SECTIONS: NavSection[] = [
       { label: 'Match Donors',      path: ROUTES.WORKFLOW_MATCH,  icon: <Target size={18} />,        allowedRoles: ['admin', 'manager'] },
       { label: 'Hospitals',         path: ROUTES.MASTER_HOSPITALS, icon: <Hospital size={18} />,    allowedRoles: ['admin', 'manager'] },
       { label: 'Blood Camps & Banks', path: ROUTES.MASTER_CAMPS,  icon: <Building2 size={18} />,    allowedRoles: ['admin', 'manager'] },
+      { label: 'Charity Drives',    path: ROUTES.EVENTS_DRIVES,   icon: <Tent size={18} />,         allowedRoles: ['manager'] },
     ],
   },
   {

@@ -24,6 +24,7 @@ import DashboardPage      from '@/pages/DashboardPage';
 import { BloodGroupsPage } from '@/pages/master/BloodGroupsPage';
 import { CampsPage }       from '@/pages/master/CampsPage';
 import { HospitalsPage }   from '@/pages/master/HospitalsPage';
+import { CharityDrivesPage } from '@/pages/events/CharityDrivesPage';
 import { RequestListPage }   from '@/pages/requests/RequestListPage';
 import { RequestCreatePage } from '@/pages/requests/RequestCreatePage';
 import { RequestDetailPage } from '@/pages/requests/RequestDetailPage';
@@ -88,6 +89,7 @@ const router = createBrowserRouter([
       { path: 'master/blood-groups', element: <RoleGuard allow={['admin']}><BloodGroupsPage /></RoleGuard> },
       { path: 'master/camps',        element: <RoleGuard allow={['manager', 'admin']}><CampsPage /></RoleGuard> },
       { path: 'master/hospitals',    element: <RoleGuard allow={['manager', 'admin']}><HospitalsPage /></RoleGuard> },
+      { path: 'master/charity-drives', element: <RoleGuard allow={['manager', 'admin']}><CharityDrivesPage /></RoleGuard> },
 
       // Reports (manager + admin)
       { path: 'reports/summary',  element: <RoleGuard allow={['manager', 'admin']}><SummaryReportPage /></RoleGuard> },

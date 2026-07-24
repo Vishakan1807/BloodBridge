@@ -14,6 +14,10 @@
       ".read": "auth != null",
       ".write": "auth != null"
     },
+    "charityDrives": {
+      ".read": "auth != null",
+      ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'manager')"
+    },
     "workflow": {
       ".read": "auth != null",
       ".write": "auth != null"

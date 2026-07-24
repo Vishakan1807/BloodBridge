@@ -18,6 +18,7 @@ import { setDonorAvailability } from '@/services/user.service';
 import { individualDonate } from '@/services/workflow.service';
 import { isBloodCompatible, sortByUrgencyAndDate } from '@/core/utils/bloodUtils';
 import { subscribeHospitals, subscribeCamps } from '@/services/master.service';
+import { subscribeCharityDrives, type CharityDrive } from '@/services/event.service';
 import type { Hospital, Camp } from '@/types/master.types';
 import type { DonationRequest } from '@/types/request.types';
 
@@ -42,6 +43,7 @@ export function DonorDashboard() {
   const [broadcastReqs, setBroadcastReqs] = useState<DonationRequest[]>([]);
   const [hospitals, setHospitals]         = useState<Hospital[]>([]);
   const [camps, setCamps]                 = useState<Camp[]>([]);
+  const [charityDrives, setCharityDrives] = useState<CharityDrive[]>([]);
   const [loading, setLoading]             = useState(true);
   const [togglingAvail, setTogglingAvail] = useState(false);
 
@@ -49,13 +51,15 @@ export function DonorDashboard() {
   const [donateTarget, setDonateTarget] = useState<DonationRequest | null>(null);
   const [donating, setDonating]         = useState(false);
 
-  // Load hospitals & camps from DB
+  // Load hospitals & camps & drives from DB
   useEffect(() => {
     const unsubHospitals = subscribeHospitals((loaded) => setHospitals(loaded));
     const unsubCamps = subscribeCamps((loaded) => setCamps(loaded));
+    const unsubDrives = subscribeCharityDrives((loaded) => setCharityDrives(loaded));
     return () => {
       unsubHospitals();
       unsubCamps();
+      unsubDrives();
     };
   }, []);
 
@@ -402,9 +406,11 @@ export function DonorDashboard() {
         </div>
         
         {(() => {
-          // TODO: Fetch temporary charity camps in the future. 
-          // Currently, we only have permanent blood banks in the database, so we force empty state.
-          const upcomingCamps: any[] = [];
+          const upcomingCamps = charityDrives.filter(c => 
+            c.isActive && 
+            c.endDate >= Date.now() && 
+            c.city.toLowerCase() === (userProfile?.city || '').toLowerCase()
+          );
           
           if (upcomingCamps.length === 0) {
             return (
@@ -414,7 +420,19 @@ export function DonorDashboard() {
             );
           }
           
-          return null;
+          return (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {upcomingCamps.map(camp => (
+                <div key={camp.id} className="p-4 bg-surface-700/50 rounded-xl border border-surface-600/50">
+                  <h3 className="font-display font-bold text-white mb-1">{camp.name}</h3>
+                  <p className="text-xs text-muted mb-2">{camp.address}</p>
+                  <p className="text-xs font-semibold text-brand-400">
+                    {new Date(camp.startDate).toLocaleDateString()} - {new Date(camp.endDate).toLocaleDateString()}
+                  </p>
+                </div>
+              ))}
+            </div>
+          );
         })()}
       </Card>
 

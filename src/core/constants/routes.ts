@@ -21,6 +21,7 @@ export const ROUTES = {
   MASTER_BLOOD_GROUPS: '/master/blood-groups',
   MASTER_CAMPS:        '/master/camps',
   MASTER_HOSPITALS:    '/master/hospitals',
+  EVENTS_DRIVES:       '/master/charity-drives',
 
   // Reports
   REPORTS_SUMMARY:  '/reports/summary',
