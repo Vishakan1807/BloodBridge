@@ -175,7 +175,7 @@ export function DonorDashboard() {
           <div className="flex items-center gap-2 mb-1">
             <HeartHandshake size={20} className={isAvailable ? 'text-success' : 'text-muted'} />
             <h2 className="font-display font-semibold text-white text-base">
-              Donor Availability
+              Wish to donate blood?
             </h2>
             {isAvailable && (
               <span className="text-[10px] font-bold bg-success/20 text-success px-2 py-0.5 rounded-full animate-pulse">
