@@ -154,21 +154,15 @@ export function DonorDashboard() {
   return (
     <div className="space-y-6 page-enter">
       {/* Welcome Banner */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-surface-800 border border-surface-600/40 rounded-2xl p-6">
-        <div>
-          <h1 className="font-display font-bold text-2xl text-white">
-            Hello, {userProfile?.displayName ?? 'Member'}! 🩸
-          </h1>
-          <p className="text-muted text-sm mt-1">
-            Blood Group: <span className="font-semibold text-brand-400">{userProfile?.bloodGroup ?? 'Not Set'}</span>
-            {' · '}District: <span className="font-semibold text-slate-200">{userProfile?.city || 'Not Set'}</span>
-          </p>
-        </div>
-        <Link to={ROUTES.REQUEST_NEW}>
-          <Button variant="primary" icon={<PlusCircle size={18} />}>
-            Raise Donation Request
-          </Button>
-        </Link>
+      <div className="mb-2">
+        <h1 className="font-display font-bold text-3xl text-white">
+          Hello, {userProfile?.displayName ?? 'Member'}! 🩸
+        </h1>
+        <p className="text-muted text-sm mt-1.5">
+          Blood Group: <span className="font-semibold text-brand-400 px-1">{userProfile?.bloodGroup ?? 'Not Set'}</span>
+          <span className="text-surface-600 px-1">|</span>
+          District: <span className="font-semibold text-slate-200 pl-1">{userProfile?.city || 'Not Set'}</span>
+        </p>
       </div>
 
       {/* ── Donor Availability Toggle Card ─────────────────── */}
@@ -225,6 +219,19 @@ export function DonorDashboard() {
             : <><ToggleLeft size={22} /> Unavailable (OFF)</>
           }
         </button>
+      </div>
+
+      {/* ── Raise Request CTA ──────────────────────────────── */}
+      <div className="bg-surface-800 border border-surface-600/40 rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h2 className="font-display font-semibold text-lg text-white">Emergency Blood Requirement?</h2>
+          <p className="text-xs text-muted mt-1">If you or someone you know needs blood urgently, create a verified request to notify local donors.</p>
+        </div>
+        <Link to={ROUTES.REQUEST_NEW} className="shrink-0">
+          <Button variant="primary" icon={<PlusCircle size={18} />}>
+            Raise Donation Request
+          </Button>
+        </Link>
       </div>
 
       {/* ── KPI Grid ─────────────────────────────────────────── */}
