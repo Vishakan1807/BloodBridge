@@ -212,18 +212,20 @@ export function CoordinatorDashboard() {
       </div>
 
       {/* Quick Actions */}
-      <div className="flex gap-4">
-        <Link to={ROUTES.WORKFLOW_VERIFY} className="flex-1">
-          <Button variant="secondary" fullWidth icon={<ShieldCheck size={18} />}>
-            Open Verification Queue ({pendingVerifications})
-          </Button>
-        </Link>
-        <Link to={ROUTES.WORKFLOW_MATCH} className="flex-1">
-          <Button variant="secondary" fullWidth icon={<Target size={18} />}>
-            Fulfillment Status
-          </Button>
-        </Link>
-      </div>
+      {isAdmin && (
+        <div className="flex gap-4">
+          <Link to={ROUTES.WORKFLOW_VERIFY} className="flex-1">
+            <Button variant="secondary" fullWidth icon={<ShieldCheck size={18} />}>
+              Open Verification Queue ({pendingVerifications})
+            </Button>
+          </Link>
+          <Link to={ROUTES.WORKFLOW_MATCH} className="flex-1">
+            <Button variant="secondary" fullWidth icon={<Target size={18} />}>
+              Fulfillment Status
+            </Button>
+          </Link>
+        </div>
+      )}
 
       {/* City Requests — First-Come-First-Serve Donate Panel */}
       <Card padding="lg">

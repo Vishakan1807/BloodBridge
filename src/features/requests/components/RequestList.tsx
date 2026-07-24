@@ -116,11 +116,13 @@ export function RequestList() {
           </p>
         </div>
 
-        <Link to={ROUTES.REQUEST_NEW}>
-          <Button variant="primary" icon={<PlusCircle size={18} />}>
-            New Request
-          </Button>
-        </Link>
+        {isUserRole && (
+          <Link to={ROUTES.REQUEST_NEW}>
+            <Button variant="primary" icon={<PlusCircle size={18} />}>
+              New Request
+            </Button>
+          </Link>
+        )}
       </div>
 
       {/* ── Active vs Expired Tab Switcher ─────────────────────────── */}
