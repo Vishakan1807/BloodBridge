@@ -82,13 +82,13 @@ const router = createBrowserRouter([
       { path: 'requests/:id/edit', element: <RequestEditPage /> },
 
       // Workflow (manager + admin)
-      { path: 'workflow/verify', element: <RoleGuard allow={['manager', 'admin']}><VerificationPage /></RoleGuard> },
-      { path: 'workflow/match',  element: <RoleGuard allow={['manager', 'admin']}><MatchingPage /></RoleGuard> },
+      { path: 'workflow/verify', element: <RoleGuard allow={['admin']}><VerificationPage /></RoleGuard> },
+      { path: 'workflow/match',  element: <RoleGuard allow={['admin']}><MatchingPage /></RoleGuard> },
 
       // Master Data & Locations (manager + admin)
       { path: 'master/blood-groups', element: <RoleGuard allow={['admin']}><BloodGroupsPage /></RoleGuard> },
-      { path: 'master/camps',        element: <RoleGuard allow={['manager', 'admin']}><CampsPage /></RoleGuard> },
-      { path: 'master/hospitals',    element: <RoleGuard allow={['manager', 'admin']}><HospitalsPage /></RoleGuard> },
+      { path: 'master/camps',        element: <RoleGuard allow={['admin']}><CampsPage /></RoleGuard> },
+      { path: 'master/hospitals',    element: <RoleGuard allow={['admin']}><HospitalsPage /></RoleGuard> },
       { path: 'master/charity-drives', element: <RoleGuard allow={['manager', 'admin']}><CharityDrivesPage /></RoleGuard> },
 
       // Reports (manager + admin)
