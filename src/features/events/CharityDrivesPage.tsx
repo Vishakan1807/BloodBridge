@@ -298,10 +298,10 @@ export function CharityDrivesPage() {
         isOpen={!!deleteTarget}
         title="Delete Charity Drive"
         message={`Are you sure you want to delete "${deleteTarget?.name}"? This action cannot be undone.`}
-        confirmLabel={deleting ? 'Deleting...' : 'Delete Drive'}
         onConfirm={handleDeleteConfirm}
         onCancel={() => !deleting && setDeleteTarget(null)}
-        isDestructive
+        danger={true}
+        loading={deleting}
       />
     </div>
   );
