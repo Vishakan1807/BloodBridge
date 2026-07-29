@@ -144,15 +144,20 @@ export default function LoginPage() {
       }
       
       const verifier = setupRecaptcha('recaptcha-container');
+      await verifier.render();
       (window as any).recaptchaVerifier = verifier;
 
       const result = await sendPhoneOtp(phoneNumber, verifier);
       setConfResult(result);
       setOtpSent(true);
-      showSuccess('OTP sent successfully via SMS.');
+      showSuccess('OTP sent successfully!');
     } catch (err: any) {
       console.error('[Full Phone Auth Error]:', err);
-      showError(parseFirebaseError(err?.code || '') || 'Failed to send OTP.');
+      if (err?.code === 'auth/invalid-app-credential') {
+        showError('SMS rate-limited or reCAPTCHA error. TIP: In Firebase Console -> Authentication -> Phone -> Add your number to "Test phone numbers" to bypass SMS limits instantly!');
+      } else {
+        showError(parseFirebaseError(err?.code || '') || 'Failed to send OTP.');
+      }
     } finally {
       setLoading(false);
     }
