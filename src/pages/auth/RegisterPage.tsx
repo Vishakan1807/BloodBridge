@@ -171,7 +171,7 @@ export default function RegisterPage() {
     setLoading(true);
     try {
       if (phoneAuth && currentUser) {
-        await createProfile(currentUser.uid, undefined, {
+        await createProfile(currentUser.uid, '', {
           displayName: form.displayName.trim(),
           phone:       form.phone.replace(/\s/g, ''),
           city:        form.city.trim(),

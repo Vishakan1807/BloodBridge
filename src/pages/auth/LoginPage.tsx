@@ -25,12 +25,13 @@ function parseFirebaseError(code: string): string {
     'auth/quota-exceeded':            'SMS quota exceeded. Please try again later or use email sign-in.',
     'auth/billing-not-enabled':       'Phone authentication requires Firebase Billing to be enabled. Please check console.',
     'auth/operation-not-allowed':     'SMS sending is blocked for this region. Please enable the region in Firebase Console -> Authentication -> Settings -> SMS Region Policy.',
-    'auth/invalid-app-credential':    'reCAPTCHA verification failed. If testing locally, use a test number or deploy to a live URL.',
+    'auth/invalid-app-credential':    'reCAPTCHA verification failed. If testing on Vercel, make sure this domain is added to Firebase -> Authentication -> Settings -> Authorized domains.',
+    'auth/captcha-check-failed':      'reCAPTCHA verification failed. Add your Vercel URL to Authorized Domains in Firebase Console.',
   };
   
   console.error('[Firebase Error Code]:', code);
   
-  return map[code] ?? 'Authentication failed. Please verify your details and try again.';
+  return map[code] || (code ? `Authentication error (${code.replace('auth/', '')}). Please check Firebase console settings.` : 'Authentication failed. Please verify your details and try again.');
 }
 
 // ── Highlights for the hero panel ──────────────────────────────

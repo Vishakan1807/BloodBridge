@@ -9,13 +9,13 @@ export async function createProfile(
   data: Partial<UserProfile>,
 ): Promise<void> {
   const profile: UserProfile = {
-    uid,
-    email,
+    uid:          uid || '',
+    email:        email || '',
     displayName:  data.displayName || 'Unknown',
     phone:        data.phone || '',
     city:         data.city || '',
     role:         'user',           // Always 'user' on self-registration
-    bloodGroup:   data.bloodGroup || null,
+    bloodGroup:   data.bloodGroup || '',
     campId:       null,
     isActive:     true,
     isVerified:   false,
@@ -32,7 +32,7 @@ export async function getProfile(uid: string): Promise<UserProfile | null> {
   const snapshot = await get(ref(db, `users/${uid}`));
   if (!snapshot.exists()) return null;
   const val = snapshot.val() || {};
-  return { ...val, uid: val.uid || uid } as UserProfile;
+  return { ...val, uid: val.uid || uid, email: val.email || '' } as UserProfile;
 }
 
 // ── Update Profile ────────────────────────────────────────────
@@ -40,8 +40,15 @@ export async function updateUserProfile(
   uid: string,
   data: Partial<UserProfile>,
 ): Promise<void> {
+  // Filter out any undefined values so Firebase update never throws
+  const cleanData: Record<string, any> = {};
+  Object.entries(data).forEach(([key, value]) => {
+    if (value !== undefined) {
+      cleanData[key] = value;
+    }
+  });
   await update(ref(db, `users/${uid}`), {
-    ...data,
+    ...cleanData,
     updatedAt: Date.now(),
   });
 }

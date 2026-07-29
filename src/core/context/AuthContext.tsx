@@ -55,7 +55,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             // Profile missing — create minimal stub so app never crashes
             const stub: UserProfile = {
               uid:         user.uid,
-              email:       user.email || undefined,
+              email:       user.email || '',
               displayName: user.displayName || user.phoneNumber || user.email?.split('@')[0] || 'User',
               phone:       user.phoneNumber || '',
               city:        '',
