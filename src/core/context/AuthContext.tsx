@@ -50,7 +50,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         try {
           const profile = await getProfile(user.uid);
           if (profile) {
-            setUserProfile(profile);
+            setUserProfile({ ...profile, uid: profile.uid || user.uid });
           } else {
             // Profile missing — create minimal stub so app never crashes
             const stub: UserProfile = {

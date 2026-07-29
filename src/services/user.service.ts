@@ -31,7 +31,8 @@ export async function createProfile(
 export async function getProfile(uid: string): Promise<UserProfile | null> {
   const snapshot = await get(ref(db, `users/${uid}`));
   if (!snapshot.exists()) return null;
-  return snapshot.val() as UserProfile;
+  const val = snapshot.val() || {};
+  return { ...val, uid: val.uid || uid } as UserProfile;
 }
 
 // ── Update Profile ────────────────────────────────────────────

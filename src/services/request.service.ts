@@ -29,23 +29,24 @@ export async function createRequest(
 
   const now = Date.now();
   // Broadcast district is determined primarily by the Destination Hospital's district, falling back to requester's district
-  const broadcastDistrict = dto.hospitalCity?.trim() || user.city?.trim() || '';
+  const broadcastDistrict = dto.hospitalCity?.trim() || user?.city?.trim() || '';
+  const creatorUid = user?.uid || (user as any)?.id || 'anonymous';
 
   const requestData: DonationRequest = {
     id,
     referenceNumber,
-    createdBy:          user.uid,
-    donorName:          user.displayName || 'Anonymous Donor',
-    donorBloodGroup:    user.bloodGroup || dto.requiredBloodGroup,
+    createdBy:          creatorUid,
+    donorName:          user?.displayName || 'Anonymous Donor',
+    donorBloodGroup:    user?.bloodGroup || dto.requiredBloodGroup || 'O+',
     donorCity:          broadcastDistrict,   // Hospital/district used for broadcast
-    requiredBloodGroup: dto.requiredBloodGroup,
-    unitsRequired:      dto.unitsRequired,
+    requiredBloodGroup: dto.requiredBloodGroup || 'O+',
+    unitsRequired:      dto.unitsRequired || 1,
     unitsFulfilled:     0,                  // Tracks partial donations progress
-    urgency:            dto.urgency,
-    hospitalId:         dto.hospitalId,
-    hospitalName:       dto.hospitalName,
-    patientName:        dto.patientName.trim(),
-    requiredByDate:     dto.requiredByDate,
+    urgency:            dto.urgency || 'Normal',
+    hospitalId:         dto.hospitalId || '',
+    hospitalName:       dto.hospitalName || 'Selected Hospital',
+    patientName:        (dto.patientName || '').trim(),
+    requiredByDate:     dto.requiredByDate || now,
     notes:              dto.notes?.trim() || '',
     status:             'verified',
     campId:             'broadcast',
@@ -66,9 +67,9 @@ export async function createRequest(
   await set(wfEntryRef, {
     fromState: null,
     toState:   'verified',
-    actorUid:  user.uid,
-    actorName: user.displayName,
-    actorRole: user.role,
+    actorUid:  creatorUid,
+    actorName: user?.displayName || 'Anonymous Donor',
+    actorRole: user?.role || 'user',
     note:      `Donation request created and auto-broadcast to ${broadcastDistrict || 'district'}.`,
     timestamp: now,
   });
