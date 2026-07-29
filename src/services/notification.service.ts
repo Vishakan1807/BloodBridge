@@ -132,10 +132,18 @@ async function dispatchWhatsApp(data: {
   }
 
   // Normalize phone number to E.164 format (e.g. +919876543210)
-  let phone = data.toPhone.replace(/[\s\-()]/g, '');
+  let phone = data.toPhone.replace(/[^\d+]/g, '');
   if (!phone.startsWith('+')) {
-    // Assume Indian number if no country code prefix
-    phone = phone.startsWith('91') ? `+${phone}` : `+91${phone}`;
+    // Automatically attach Indian +91 country code to standard 10-digit numbers
+    if (phone.length === 10) {
+      phone = `+91${phone}`;
+    } else if (phone.length === 12 && phone.startsWith('91')) {
+      phone = `+${phone}`;
+    } else if (phone.length === 11 && phone.startsWith('0')) {
+      phone = `+91${phone.slice(1)}`;
+    } else {
+      phone = `+91${phone}`;
+    }
   }
 
   try {
@@ -173,9 +181,13 @@ async function dispatchWhatsApp(data: {
     if (templateRes.ok) {
       console.info(`[BloodBridge Notif] WhatsApp template message sent to ${phone}`);
       return true;
+    } else {
+      const tmplErr = await templateRes.text();
+      console.warn(`[BloodBridge Notif] WhatsApp template ('${waTemplateId}') attempt failed:`, tmplErr);
     }
 
-    // Strategy 2: If template fails (e.g. within 24hr window), try a free-form text message
+    // Strategy 2: If template fails (e.g. still in review), try a free-form text message
+    // Note: Free-form text ONLY works if the recipient messaged the bot within the last 24 hours.
     const textRes = await fetch(
       `https://graph.facebook.com/v21.0/${waPhoneId}/messages`,
       {
@@ -202,7 +214,8 @@ async function dispatchWhatsApp(data: {
     }
 
     const errBody = await textRes.text();
-    console.error(`[BloodBridge Notif] WhatsApp dispatch failed (${textRes.status}):`, errBody);
+    console.error(`[BloodBridge Notif] WhatsApp fallback text dispatch failed (${textRes.status}):`, errBody);
+    console.error(`[BloodBridge Notif] TIP: If testing in Meta Sandbox and template is not approved yet, you MUST send a message (like "hi") from ${phone} to the test WhatsApp number first to open the 24-hour testing window.`);
     return false;
   } catch (err) {
     console.error('[BloodBridge Notif] WhatsApp Cloud API dispatch failed:', err);
