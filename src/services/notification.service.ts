@@ -13,6 +13,7 @@ export interface AppNotification {
   status:          'sent' | 'delivered' | 'failed';
   emailStatus?:    'sent' | 'delivered' | 'unconfigured';
   smsStatus?:      'sent' | 'delivered' | 'unconfigured';
+  whatsappStatus?: 'sent' | 'delivered' | 'unconfigured';
   requestId?:      string;
   refNumber?:      string;
   timestamp:       number;
@@ -97,7 +98,119 @@ async function dispatchRealSMS(data: {
   }
 }
 
-// ── Send Notification (Firebase + Real EmailJS & SMS Dispatch) ──
+// ── WhatsApp Business Cloud API Dispatch ────────────────────────
+//
+// Uses Meta's free-tier WhatsApp Cloud API (1,000 conversations/month free).
+// Requires:
+//   1. Meta Developer account → create an app → add WhatsApp product
+//   2. A WhatsApp Business phone number (provided free in sandbox)
+//   3. An approved message template (e.g. "bloodbridge_alert")
+//   4. Set VITE_WHATSAPP_TOKEN and VITE_WHATSAPP_PHONE_ID in .env.local
+//
+// Template setup: Create a template named "bloodbridge_alert" with body:
+//   "{{1}}: {{2}}"
+// where {{1}} = title, {{2}} = message body.
+//
+// For sandbox/testing, you can send to any number you've registered
+// in the Meta Developer dashboard under WhatsApp > API Setup > Test Numbers.
+// ─────────────────────────────────────────────────────────────────
+
+async function dispatchWhatsApp(data: {
+  toPhone:    string;
+  toName:     string;
+  title:      string;
+  message:    string;
+  refNumber?: string;
+}): Promise<boolean> {
+  const waToken   = import.meta.env.VITE_WHATSAPP_TOKEN;
+  const waPhoneId = import.meta.env.VITE_WHATSAPP_PHONE_ID;
+  const waTemplateId = import.meta.env.VITE_WHATSAPP_TEMPLATE_NAME || 'bloodbridge_alert';
+
+  if (!waToken || !waPhoneId) {
+    console.info('[BloodBridge Notif] WhatsApp Cloud API keys not configured in .env.local. Logged to database.');
+    return false;
+  }
+
+  // Normalize phone number to E.164 format (e.g. +919876543210)
+  let phone = data.toPhone.replace(/[\s\-()]/g, '');
+  if (!phone.startsWith('+')) {
+    // Assume Indian number if no country code prefix
+    phone = phone.startsWith('91') ? `+${phone}` : `+91${phone}`;
+  }
+
+  try {
+    // Strategy 1: Try sending a pre-approved template message first
+    // Templates are required for initiating conversations (outside 24hr window)
+    const templateRes = await fetch(
+      `https://graph.facebook.com/v21.0/${waPhoneId}/messages`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${waToken}`,
+          'Content-Type':  'application/json',
+        },
+        body: JSON.stringify({
+          messaging_product: 'whatsapp',
+          to:                phone,
+          type:              'template',
+          template: {
+            name:     waTemplateId,
+            language: { code: 'en' },
+            components: [
+              {
+                type:       'body',
+                parameters: [
+                  { type: 'text', text: data.title },
+                  { type: 'text', text: data.message },
+                ],
+              },
+            ],
+          },
+        }),
+      }
+    );
+
+    if (templateRes.ok) {
+      console.info(`[BloodBridge Notif] WhatsApp template message sent to ${phone}`);
+      return true;
+    }
+
+    // Strategy 2: If template fails (e.g. within 24hr window), try a free-form text message
+    const textRes = await fetch(
+      `https://graph.facebook.com/v21.0/${waPhoneId}/messages`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${waToken}`,
+          'Content-Type':  'application/json',
+        },
+        body: JSON.stringify({
+          messaging_product: 'whatsapp',
+          to:                phone,
+          type:              'text',
+          text: {
+            preview_url: false,
+            body:        `*${data.title}*\n\n${data.message}${data.refNumber ? `\n\n📋 Ref: ${data.refNumber}` : ''}`,
+          },
+        }),
+      }
+    );
+
+    if (textRes.ok) {
+      console.info(`[BloodBridge Notif] WhatsApp text message sent to ${phone}`);
+      return true;
+    }
+
+    const errBody = await textRes.text();
+    console.error(`[BloodBridge Notif] WhatsApp dispatch failed (${textRes.status}):`, errBody);
+    return false;
+  } catch (err) {
+    console.error('[BloodBridge Notif] WhatsApp Cloud API dispatch failed:', err);
+    return false;
+  }
+}
+
+// ── Send Notification (Firebase + Real EmailJS, SMS & WhatsApp Dispatch) ──
 export async function sendNotification(data: {
   recipientUid:    string;
   recipientEmail?: string;
@@ -112,9 +225,10 @@ export async function sendNotification(data: {
   const now = Date.now();
   const notifRef = push(ref(db, `notifications/${data.recipientUid}`));
 
-  // Execute real external Email & SMS API calls if configured
-  let emailSuccess = false;
-  let smsSuccess = false;
+  // Execute real external Email, SMS & WhatsApp API calls if configured
+  let emailSuccess    = false;
+  let smsSuccess      = false;
+  let whatsappSuccess = false;
 
   if (data.recipientEmail && (data.channel === 'email' || data.channel === 'both' || !data.channel)) {
     emailSuccess = await dispatchRealEmail({
@@ -134,22 +248,34 @@ export async function sendNotification(data: {
     });
   }
 
+  // WhatsApp is dispatched whenever a phone number is available (runs alongside email & SMS)
+  if (data.recipientPhone) {
+    whatsappSuccess = await dispatchWhatsApp({
+      toPhone:    data.recipientPhone,
+      toName:     data.recipientName,
+      title:      data.title,
+      message:    data.message,
+      refNumber:  data.refNumber,
+    });
+  }
+
   const notification: AppNotification = {
-    id:             notifRef.key || `notif-${now}`,
-    recipientUid:   data.recipientUid,
-    recipientEmail: data.recipientEmail,
-    recipientPhone: data.recipientPhone,
-    recipientName:  data.recipientName,
-    title:          data.title,
-    message:        data.message,
-    channel:        data.channel || 'both',
-    status:         'sent',
-    emailStatus:    emailSuccess ? 'delivered' : 'unconfigured',
-    smsStatus:      smsSuccess ? 'delivered' : 'unconfigured',
-    requestId:      data.requestId,
-    refNumber:      data.refNumber,
-    timestamp:      now,
-    isRead:         false,
+    id:              notifRef.key || `notif-${now}`,
+    recipientUid:    data.recipientUid,
+    recipientEmail:  data.recipientEmail,
+    recipientPhone:  data.recipientPhone,
+    recipientName:   data.recipientName,
+    title:           data.title,
+    message:         data.message,
+    channel:         data.channel || 'both',
+    status:          'sent',
+    emailStatus:     emailSuccess    ? 'delivered' : 'unconfigured',
+    smsStatus:       smsSuccess      ? 'delivered' : 'unconfigured',
+    whatsappStatus:  whatsappSuccess ? 'delivered' : 'unconfigured',
+    requestId:       data.requestId,
+    refNumber:       data.refNumber,
+    timestamp:       now,
+    isRead:          false,
   };
 
   // Write notification to Firebase for recipient's real-time inbox
@@ -169,6 +295,20 @@ export async function sendNotification(data: {
     status:      smsSuccess ? 'DELIVERED_TO_CARRIER' : 'DISPATCHED_TO_SYSTEM',
     timestamp:   now,
   });
+
+  // Write to WhatsApp Log node
+  if (data.recipientPhone) {
+    const waRef = push(ref(db, 'whatsappLogs'));
+    await set(waRef, {
+      id:          waRef.key,
+      toPhone:     data.recipientPhone,
+      toName:      data.recipientName,
+      title:       data.title,
+      message:     data.message,
+      status:      whatsappSuccess ? 'DELIVERED' : 'DISPATCHED_TO_SYSTEM',
+      timestamp:   now,
+    });
+  }
 }
 
 // ── Subscribe to User Notifications ───────────────────────────
