@@ -100,19 +100,12 @@ async function dispatchRealSMS(data: {
 
 // ── WhatsApp Business Cloud API Dispatch ────────────────────────
 //
-// Uses Meta's free-tier WhatsApp Cloud API (1,000 conversations/month free).
-// Requires:
-//   1. Meta Developer account → create an app → add WhatsApp product
-//   2. A WhatsApp Business phone number (provided free in sandbox)
-//   3. An approved message template (e.g. "bloodbridge_alert")
-//   4. Set VITE_WHATSAPP_TOKEN and VITE_WHATSAPP_PHONE_ID in .env.local
+// Uses a Vercel serverless function (/api/whatsapp) to proxy calls to
+// Meta's Graph API. Direct browser fetch() to graph.facebook.com is
+// blocked by CORS — all WhatsApp calls MUST go through server-side proxy.
 //
-// Template setup: Create a template named "bloodbridge_alert" with body:
-//   "{{1}}: {{2}}"
-// where {{1}} = title, {{2}} = message body.
-//
-// For sandbox/testing, you can send to any number you've registered
-// in the Meta Developer dashboard under WhatsApp > API Setup > Test Numbers.
+// The serverless function reads WHATSAPP_TOKEN and WHATSAPP_PHONE_ID
+// from Vercel environment variables (server-side, secure).
 // ─────────────────────────────────────────────────────────────────
 
 async function dispatchWhatsApp(data: {
@@ -122,19 +115,9 @@ async function dispatchWhatsApp(data: {
   message:    string;
   refNumber?: string;
 }): Promise<boolean> {
-  const waToken   = import.meta.env.VITE_WHATSAPP_TOKEN;
-  const waPhoneId = import.meta.env.VITE_WHATSAPP_PHONE_ID;
-  const waTemplateId = import.meta.env.VITE_WHATSAPP_TEMPLATE_NAME || 'bloodbridge_alert';
-
-  if (!waToken || !waPhoneId) {
-    console.info('[BloodBridge Notif] WhatsApp Cloud API keys not configured in .env.local. Logged to database.');
-    return false;
-  }
-
-  // Normalize phone number to E.164 format (e.g. +919876543210)
+  // Normalize phone number to a clean format for the API
   let phone = data.toPhone.replace(/[^\d+]/g, '');
   if (!phone.startsWith('+')) {
-    // Automatically attach Indian +91 country code to standard 10-digit numbers
     if (phone.length === 10) {
       phone = `+91${phone}`;
     } else if (phone.length === 12 && phone.startsWith('91')) {
@@ -147,78 +130,30 @@ async function dispatchWhatsApp(data: {
   }
 
   try {
-    // Strategy 1: Try sending a pre-approved template message first
-    // Templates are required for initiating conversations (outside 24hr window)
-    const templateRes = await fetch(
-      `https://graph.facebook.com/v21.0/${waPhoneId}/messages`,
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${waToken}`,
-          'Content-Type':  'application/json',
-        },
-        body: JSON.stringify({
-          messaging_product: 'whatsapp',
-          to:                phone,
-          type:              'template',
-          template: {
-            name:     waTemplateId,
-            language: { code: 'en' },
-            components: [
-              {
-                type:       'body',
-                parameters: [
-                  { type: 'text', text: data.title },
-                  { type: 'text', text: data.message },
-                ],
-              },
-            ],
-          },
-        }),
-      }
-    );
+    // Call our Vercel serverless proxy (bypasses CORS)
+    const res = await fetch('/api/whatsapp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        phone,
+        title:        data.title,
+        message:      data.message,
+        refNumber:    data.refNumber,
+        templateName: import.meta.env.VITE_WHATSAPP_TEMPLATE_NAME || 'bloodbridge_alert',
+      }),
+    });
 
-    if (templateRes.ok) {
-      console.info(`[BloodBridge Notif] WhatsApp template message sent to ${phone}`);
-      return true;
-    } else {
-      const tmplErr = await templateRes.text();
-      console.warn(`[BloodBridge Notif] WhatsApp template ('${waTemplateId}') attempt failed:`, tmplErr);
-    }
-
-    // Strategy 2: If template fails (e.g. still in review), try a free-form text message
-    // Note: Free-form text ONLY works if the recipient messaged the bot within the last 24 hours.
-    const textRes = await fetch(
-      `https://graph.facebook.com/v21.0/${waPhoneId}/messages`,
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${waToken}`,
-          'Content-Type':  'application/json',
-        },
-        body: JSON.stringify({
-          messaging_product: 'whatsapp',
-          to:                phone,
-          type:              'text',
-          text: {
-            preview_url: false,
-            body:        `*${data.title}*\n\n${data.message}${data.refNumber ? `\n\n📋 Ref: ${data.refNumber}` : ''}`,
-          },
-        }),
-      }
-    );
-
-    if (textRes.ok) {
-      console.info(`[BloodBridge Notif] WhatsApp text message sent to ${phone}`);
+    if (res.ok) {
+      const result = await res.json();
+      console.info(`[BloodBridge Notif] WhatsApp message sent to ${phone} via ${result.method || 'proxy'}`);
       return true;
     }
 
-    const errBody = await textRes.text();
-    console.error(`[BloodBridge Notif] WhatsApp fallback text dispatch failed (${textRes.status}):`, errBody);
-    console.error(`[BloodBridge Notif] TIP: If testing in Meta Sandbox and template is not approved yet, you MUST send a message (like "hi") from ${phone} to the test WhatsApp number first to open the 24-hour testing window.`);
+    const errBody = await res.text();
+    console.error(`[BloodBridge Notif] WhatsApp proxy returned ${res.status}:`, errBody);
     return false;
   } catch (err) {
-    console.error('[BloodBridge Notif] WhatsApp Cloud API dispatch failed:', err);
+    console.error('[BloodBridge Notif] WhatsApp dispatch failed (proxy unreachable — are you on localhost?):', err);
     return false;
   }
 }
