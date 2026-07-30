@@ -7,7 +7,8 @@ import React, {
   type ReactNode,
 } from 'react';
 import { onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
-import { auth } from '@/core/config/firebase';
+import { ref, onValue } from 'firebase/database';
+import { auth, db } from '@/core/config/firebase';
 import {
   signIn as authSignIn,
   signUp as authSignUp,
