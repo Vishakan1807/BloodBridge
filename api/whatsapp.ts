@@ -1,6 +1,22 @@
 // Vercel Serverless Function — WhatsApp Cloud API Proxy
 // Meta's Graph API blocks browser CORS, so all WhatsApp calls must go through this server-side proxy.
 
+// Helper to log Meta errors plainly so Vercel doesn't collapse them into { error: ... }
+function logMetaError(stepName: string, responseText: string) {
+  try {
+    const json = JSON.parse(responseText);
+    const err = json.error || {};
+    const errCode = err.code ?? 'Unknown Code';
+    const subcode = err.error_subcode ?? 'N/A';
+    const errType = err.type ?? 'Unknown Type';
+    const errMsg  = err.message ?? responseText;
+    
+    console.error(`❌ [Meta API Error - ${stepName}] Code: ${errCode} (Subcode: ${subcode}) | Type: ${errType} | Message: ${errMsg}`);
+  } catch {
+    console.error(`❌ [Meta API Error - ${stepName}] Raw response: ${responseText}`);
+  }
+}
+
 export default async function handler(req: any, res: any) {
   // Set CORS headers for the response
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -20,43 +36,32 @@ export default async function handler(req: any, res: any) {
   const waPhoneId = process.env.WHATSAPP_PHONE_ID || process.env.VITE_WHATSAPP_PHONE_ID;
   const defaultTemplate = process.env.WHATSAPP_TEMPLATE_NAME || process.env.VITE_WHATSAPP_TEMPLATE_NAME || 'bloodbridge_alert';
 
-  console.log('[WhatsApp API] Config check:', {
-    hasToken:   !!waToken,
-    tokenStart: waToken ? waToken.substring(0, 10) + '...' : 'MISSING',
-    phoneId:    waPhoneId || 'MISSING',
-    template:   defaultTemplate,
-  });
-
   if (!waToken || !waPhoneId) {
-    console.error('[WhatsApp API] FATAL: WhatsApp credentials not configured!');
+    console.error('❌ [WhatsApp API] FATAL: WhatsApp credentials (token or phone ID) are not configured in Vercel.');
     return res.status(500).json({ error: 'WhatsApp credentials not configured on server.' });
   }
 
   const { phone, title, message, refNumber, templateName } = req.body || {};
-
-  console.log('[WhatsApp API] Request received:', { phone, title: title?.substring(0, 50), templateName });
 
   if (!phone) {
     return res.status(400).json({ error: 'Phone number is required.' });
   }
 
   // Normalize phone to E.164 format WITHOUT the + prefix (Meta requires digits only)
-  let normalizedPhone = (phone || '').replace(/[^\d]/g, ''); // strip everything except digits
+  let normalizedPhone = (phone || '').replace(/[^\d]/g, '');
   if (normalizedPhone.length === 10) {
     normalizedPhone = `91${normalizedPhone}`;
   } else if (normalizedPhone.length === 11 && normalizedPhone.startsWith('0')) {
     normalizedPhone = `91${normalizedPhone.slice(1)}`;
   }
-  // If it already starts with 91 and is 12 digits, it's ready
-  // If it's some other format, just use as-is
 
-  console.log('[WhatsApp API] Normalized phone:', normalizedPhone);
+  console.log(`[WhatsApp API] Attempting delivery to phone: ${normalizedPhone} | Template: ${templateName || defaultTemplate}`);
 
   const usedTemplate = templateName || defaultTemplate;
 
-  // Strategy 1: Try approved template message
   try {
-    const templateBody = {
+    // Strategy 1: Template with parameters + en_US language code
+    const bodyWithParams_enUS = {
       messaging_product: 'whatsapp',
       to:                normalizedPhone,
       type:              'template',
@@ -75,105 +80,101 @@ export default async function handler(req: any, res: any) {
       },
     };
 
-    console.log('[WhatsApp API] Sending template request:', JSON.stringify(templateBody));
-
-    const templateRes = await fetch(
-      `https://graph.facebook.com/v21.0/${waPhoneId}/messages`,
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${waToken}`,
-          'Content-Type':  'application/json',
-        },
-        body: JSON.stringify(templateBody),
-      }
-    );
-
-    const templateResponseText = await templateRes.text();
-    console.log(`[WhatsApp API] Template response (${templateRes.status}):`, templateResponseText);
-
-    if (templateRes.ok) {
-      let data;
-      try { data = JSON.parse(templateResponseText); } catch { data = templateResponseText; }
-      console.log('[WhatsApp API] ✅ Template message sent successfully!');
-      return res.status(200).json({ success: true, method: 'template', data });
+    const res1 = await fetch(`https://graph.facebook.com/v21.0/${waPhoneId}/messages`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${waToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(bodyWithParams_enUS),
+    });
+    const text1 = await res1.text();
+    if (res1.ok) {
+      console.log('✅ [WhatsApp API] Success with Strategy 1 (en_US with params)');
+      return res.status(200).json({ success: true, strategy: 1 });
     }
+    logMetaError('Strategy 1 - en_US with params', text1);
 
-    console.warn('[WhatsApp API] ⚠️ Template failed, trying en language code...');
+    // Strategy 2: Template with parameters + en language code
+    const bodyWithParams_en = JSON.parse(JSON.stringify(bodyWithParams_enUS));
+    bodyWithParams_en.template.language.code = 'en';
 
-    // Retry with 'en' language code (some templates use 'en' instead of 'en_US')
-    templateBody.template.language.code = 'en';
-    const retryRes = await fetch(
-      `https://graph.facebook.com/v21.0/${waPhoneId}/messages`,
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${waToken}`,
-          'Content-Type':  'application/json',
-        },
-        body: JSON.stringify(templateBody),
-      }
-    );
-
-    const retryText = await retryRes.text();
-    console.log(`[WhatsApp API] Template retry 'en' response (${retryRes.status}):`, retryText);
-
-    if (retryRes.ok) {
-      let data;
-      try { data = JSON.parse(retryText); } catch { data = retryText; }
-      console.log('[WhatsApp API] ✅ Template message sent with en language code!');
-      return res.status(200).json({ success: true, method: 'template_en', data });
+    const res2 = await fetch(`https://graph.facebook.com/v21.0/${waPhoneId}/messages`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${waToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(bodyWithParams_en),
+    });
+    const text2 = await res2.text();
+    if (res2.ok) {
+      console.log('✅ [WhatsApp API] Success with Strategy 2 (en with params)');
+      return res.status(200).json({ success: true, strategy: 2 });
     }
+    logMetaError('Strategy 2 - en with params', text2);
 
-    // Strategy 2: Fallback to free-form text (only works within 24hr conversation window)
-    console.warn('[WhatsApp API] ⚠️ Both template language codes failed. Trying free-form text...');
+    // Strategy 3: Template WITHOUT components (in case your Meta template has no {{1}} {{2}} placeholders!)
+    const bodyNoParams = {
+      messaging_product: 'whatsapp',
+      to:                normalizedPhone,
+      type:              'template',
+      template: {
+        name:     usedTemplate,
+        language: { code: 'en_US' },
+      },
+    };
 
-    const textRes = await fetch(
-      `https://graph.facebook.com/v21.0/${waPhoneId}/messages`,
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${waToken}`,
-          'Content-Type':  'application/json',
-        },
-        body: JSON.stringify({
-          messaging_product: 'whatsapp',
-          to:                normalizedPhone,
-          type:              'text',
-          text: {
-            preview_url: false,
-            body:        `*${title}*\n\n${message}${refNumber ? `\n\n📋 Ref: ${refNumber}` : ''}`,
-          },
-        }),
-      }
-    );
-
-    const textResponseText = await textRes.text();
-    console.log(`[WhatsApp API] Text response (${textRes.status}):`, textResponseText);
-
-    if (textRes.ok) {
-      let data;
-      try { data = JSON.parse(textResponseText); } catch { data = textResponseText; }
-      console.log('[WhatsApp API] ✅ Text message sent successfully!');
-      return res.status(200).json({ success: true, method: 'text', data });
+    const res3 = await fetch(`https://graph.facebook.com/v21.0/${waPhoneId}/messages`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${waToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(bodyNoParams),
+    });
+    const text3 = await res3.text();
+    if (res3.ok) {
+      console.log('✅ [WhatsApp API] Success with Strategy 3 (en_US no params)');
+      return res.status(200).json({ success: true, strategy: 3 });
     }
+    logMetaError('Strategy 3 - en_US without params', text3);
 
-    console.error('[WhatsApp API] ❌ ALL methods failed!');
-    console.error('[WhatsApp API] Template error:', templateResponseText);
-    console.error('[WhatsApp API] Template (en) error:', retryText);
-    console.error('[WhatsApp API] Text error:', textResponseText);
+    // Strategy 3b: Template WITHOUT components + en language code
+    bodyNoParams.template.language.code = 'en';
+    const res3b = await fetch(`https://graph.facebook.com/v21.0/${waPhoneId}/messages`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${waToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(bodyNoParams),
+    });
+    const text3b = await res3b.text();
+    if (res3b.ok) {
+      console.log('✅ [WhatsApp API] Success with Strategy 3b (en no params)');
+      return res.status(200).json({ success: true, strategy: '3b' });
+    }
+    logMetaError('Strategy 3b - en without params', text3b);
+
+    // Strategy 4: Fallback to free-form text (works only within 24hr window of customer messaging bot)
+    const res4 = await fetch(`https://graph.facebook.com/v21.0/${waPhoneId}/messages`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${waToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        messaging_product: 'whatsapp',
+        to:                normalizedPhone,
+        type:              'text',
+        text: {
+          preview_url: false,
+          body:        `*${title}*\n\n${message}${refNumber ? `\n\n📋 Ref: ${refNumber}` : ''}`,
+        },
+      }),
+    });
+    const text4 = await res4.text();
+    if (res4.ok) {
+      console.log('✅ [WhatsApp API] Success with Strategy 4 (free-form text)');
+      return res.status(200).json({ success: true, strategy: 4 });
+    }
+    logMetaError('Strategy 4 - free-form text', text4);
 
     return res.status(502).json({
-      error: 'All WhatsApp delivery methods failed',
-      templateError: templateResponseText,
-      templateEnError: retryText,
-      textError: textResponseText,
+      error: 'All WhatsApp delivery methods rejected by Meta',
       phone: normalizedPhone,
       template: usedTemplate,
+      lastError: text1
     });
 
   } catch (err: any) {
-    console.error('[WhatsApp API] ❌ Server exception:', err.message, err.stack);
+    console.error('❌ [WhatsApp API] Server exception:', err.message);
     return res.status(500).json({ error: err.message || 'Internal server error' });
   }
 }
