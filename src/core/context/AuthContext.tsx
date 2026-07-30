@@ -42,17 +42,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading]         = useState(true);
 
-  // Resolve profile from DB whenever Firebase auth state changes
+  // Resolve and sync profile from DB in real time whenever Firebase auth state changes
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    let unsubProfile: (() => void) | null = null;
+
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
       setCurrentUser(user);
+      if (unsubProfile) {
+        unsubProfile();
+        unsubProfile = null;
+      }
+
       if (user) {
-        try {
-          const profile = await getProfile(user.uid);
-          if (profile) {
-            setUserProfile({ ...profile, uid: profile.uid || user.uid });
+        const userRef = ref(db, `users/${user.uid}`);
+        unsubProfile = onValue(userRef, (snapshot) => {
+          if (snapshot.exists()) {
+            const val = snapshot.val() || {};
+            setUserProfile({ ...val, uid: val.uid || user.uid, email: val.email || user.email || '' });
           } else {
-            // Profile missing — create minimal stub so app never crashes
+            // Profile not created yet — use safe fallback stub
             const stub: UserProfile = {
               uid:         user.uid,
               email:       user.email || '',
@@ -60,7 +68,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               phone:       user.phoneNumber || '',
               city:        '',
               role:        'user',
-              bloodGroup:  null,
+              bloodGroup:  '',
               campId:      null,
               isActive:    true,
               isVerified:  false,
@@ -71,13 +79,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             };
             setUserProfile(stub);
           }
-        } catch {
-          setUserProfile(null);
-        }
+          setLoading(false);
+        }, () => {
+          setLoading(false);
+        });
       } else {
         setUserProfile(null);
+        setLoading(false);
       }
-      setLoading(false);
     });
 
     // Safety timeout to guarantee app renders even if Firebase is unreachable
@@ -87,6 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return () => {
       unsubscribe();
+      if (unsubProfile) unsubProfile();
       clearTimeout(timer);
     };
   }, []);

@@ -74,11 +74,14 @@ export function DonorDashboard() {
 
   // ── Load user's own requests ─────────────────────────────────
   useEffect(() => {
-    if (!userProfile?.uid) return;
+    if (!userProfile?.uid) {
+      setLoading(false);
+      return;
+    }
 
     const requestsRef = ref(db, 'requests');
     const unsub = onValue(requestsRef, (snapshot) => {
-      if (!snapshot.exists()) { setRequests([]); setLoading(false); return; }
+      if (!snapshot.exists()) { setRequests([]); setBroadcastReqs([]); setLoading(false); return; }
 
       const data       = snapshot.val();
       const allReqs    = Object.values(data) as any[];
@@ -104,6 +107,9 @@ export function DonorDashboard() {
         return reqDistrict === donorDistrict;
       }) as DonationRequest[];
       setBroadcastReqs(sortByUrgencyAndDate(visible));
+    }, (err) => {
+      console.error('[DonorDashboard Requests Error]:', err);
+      setLoading(false);
     });
 
     return () => unsub();
