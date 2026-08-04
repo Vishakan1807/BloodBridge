@@ -24,6 +24,41 @@ export class FirebaseAdapter implements IDatabaseClient {
     return id ? `${basePath}/${id}` : basePath;
   }
 
+  private flattenNestedRecords<T>(table: DatabaseTable, data: any): T[] {
+    const list: T[] = [];
+    if (!data || typeof data !== 'object') return list;
+
+    // Comments and Attachments in legacy Firebase are stored nested under requestId dictionaries:
+    // e.g., { [requestId]: { [commentId]: CommentObject } }
+    if (table === 'comments' || table === 'attachments') {
+      Object.entries(data).forEach(([reqKey, groupObj]: [string, any]) => {
+        if (groupObj && typeof groupObj === 'object') {
+          Object.entries(groupObj).forEach(([itemId, itemVal]: [string, any]) => {
+            if (itemVal && typeof itemVal === 'object') {
+              list.push({
+                ...itemVal,
+                id: itemVal.id || itemId,
+                requestId: itemVal.requestId || reqKey,
+              } as T);
+            }
+          });
+        }
+      });
+      return list;
+    }
+
+    // Standard flat table processing
+    Object.entries(data).forEach(([key, val]: [string, any]) => {
+      if (val && typeof val === 'object') {
+        list.push({
+          ...val,
+          [table === 'users' ? 'uid' : 'id']: val.uid || val.id || key,
+        } as T);
+      }
+    });
+    return list;
+  }
+
   async get<T>(table: DatabaseTable, id: string): Promise<T | null> {
     const snap = await get(ref(db, this.getPath(table, id)));
     if (!snap.exists()) return null;
@@ -36,10 +71,7 @@ export class FirebaseAdapter implements IDatabaseClient {
     if (!snap.exists()) return [];
     
     const data = snap.val() || {};
-    let list = Object.entries(data).map(([key, val]: [string, any]) => ({
-      ...val,
-      [table === 'users' ? 'uid' : 'id']: val.uid || val.id || key,
-    })) as T[];
+    let list = this.flattenNestedRecords<T>(table, data);
 
     if (filters && Object.keys(filters).length > 0) {
       list = list.filter((item: any) => {
@@ -56,7 +88,6 @@ export class FirebaseAdapter implements IDatabaseClient {
   async upsert<T>(table: DatabaseTable, id: string, data: Partial<T>): Promise<boolean> {
     const targetRef = ref(db, this.getPath(table, id));
     
-    // Check if record exists to decide set vs update, or clean undefined values
     const cleanData: Record<string, any> = {};
     Object.entries(data).forEach(([k, v]) => {
       if (v !== undefined) cleanData[k] = v;
@@ -92,10 +123,7 @@ export class FirebaseAdapter implements IDatabaseClient {
       if (id) {
         callback({ ...data, [table === 'users' ? 'uid' : 'id']: id } as T);
       } else {
-        let list = Object.entries(data).map(([key, val]: [string, any]) => ({
-          ...val,
-          [table === 'users' ? 'uid' : 'id']: val.uid || val.id || key,
-        })) as T[];
+        let list = this.flattenNestedRecords<T>(table, data);
         
         if (filters && Object.keys(filters).length > 0) {
           list = list.filter((item: any) => {

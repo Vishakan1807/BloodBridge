@@ -65,7 +65,7 @@ CREATE INDEX IF NOT EXISTS idx_hospitals_city ON hospitals(city) WHERE is_active
 
 -- 4. CAMP INVENTORIES (Real-Time Blood Unit Tracking per Camp & Group)
 CREATE TABLE IF NOT EXISTS camp_inventories (
-    camp_id VARCHAR(255) REFERENCES camps(id) ON DELETE CASCADE,
+    camp_id VARCHAR(255) NOT NULL,
     blood_group VARCHAR(128) NOT NULL,
     units INTEGER DEFAULT 0,
     last_updated_by VARCHAR(255),
@@ -85,13 +85,13 @@ CREATE TABLE IF NOT EXISTS requests (
     units_required INTEGER DEFAULT 1,
     units_fulfilled INTEGER DEFAULT 0,
     urgency VARCHAR(128) DEFAULT 'normal',
-    hospital_id VARCHAR(255) REFERENCES hospitals(id) ON DELETE SET NULL,
+    hospital_id VARCHAR(255),
     hospital_name TEXT DEFAULT 'General Hospital',
     patient_name TEXT DEFAULT 'Anonymous Patient',
     required_by_date BIGINT DEFAULT (extract(epoch from now()) * 1000)::bigint,
     notes TEXT,
     status VARCHAR(128) DEFAULT 'SUBMITTED',
-    camp_id VARCHAR(255) REFERENCES camps(id) ON DELETE SET NULL,
+    camp_id VARCHAR(255),
     camp_name TEXT,
     matched_donor_uid VARCHAR(255),
     matched_donor_name TEXT,
@@ -112,7 +112,7 @@ CREATE INDEX IF NOT EXISTS idx_requests_camp_id ON requests(camp_id);
 -- 6. COMMENTS & COMMUNICATION THREADS
 CREATE TABLE IF NOT EXISTS comments (
     id VARCHAR(255) PRIMARY KEY,
-    request_id VARCHAR(255) REFERENCES requests(id) ON DELETE CASCADE,
+    request_id VARCHAR(255),
     author_uid VARCHAR(255),
     author_name TEXT DEFAULT 'Clinician',
     author_role VARCHAR(128) DEFAULT 'user',
@@ -125,7 +125,7 @@ CREATE INDEX IF NOT EXISTS idx_comments_request_id ON comments(request_id, creat
 -- 7. FILE ATTACHMENTS & CLINICAL DOCUMENTS
 CREATE TABLE IF NOT EXISTS attachments (
     id VARCHAR(255) PRIMARY KEY,
-    request_id VARCHAR(255) REFERENCES requests(id) ON DELETE CASCADE,
+    request_id VARCHAR(255),
     uploaded_by VARCHAR(255),
     uploader_name TEXT DEFAULT 'User',
     file_name TEXT DEFAULT 'document',
@@ -152,5 +152,5 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 CREATE INDEX IF NOT EXISTS idx_audit_logs_time_event ON audit_logs(created_at DESC, event_type);
 
 -- ============================================================================
--- End of Schema Definition. All foreign key constraints and indexes configured.
+-- End of Schema Definition. All indexes configured for fast query lookups.
 -- ============================================================================
