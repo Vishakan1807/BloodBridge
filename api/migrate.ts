@@ -98,26 +98,40 @@ export default async function handler(req: any, res: any) {
         const keys = Object.keys(snakeData);
         const values = Object.values(snakeData);
 
-        if (keys.length === 0 || !snakeData[pkColumn]) continue;
+        // Verify valid identifier presence
+        if (keys.length === 0) continue;
+        if (table === 'camp_inventories' && (!snakeData.camp_id || !snakeData.blood_group)) continue;
+        if (table !== 'camp_inventories' && !snakeData[pkColumn]) continue;
 
         const colNames = keys.join(', ');
         const placeholders = keys.map((_, idx) => `$${idx + 1}`).join(', ');
         
-        const updateSet = keys
-          .filter(k => k !== pkColumn && k !== 'created_at')
-          .map(k => `${k} = EXCLUDED.${k}`)
-          .join(', ');
-
-        const conflictClause = updateSet.length > 0
-          ? `ON CONFLICT (${pkColumn}) DO UPDATE SET ${updateSet}`
-          : `ON CONFLICT (${pkColumn}) DO NOTHING`;
+        let conflictClause = '';
+        if (table === 'camp_inventories') {
+          const updateSet = keys
+            .filter(k => k !== 'camp_id' && k !== 'blood_group' && k !== 'created_at')
+            .map(k => `${k} = EXCLUDED.${k}`)
+            .join(', ');
+          conflictClause = updateSet.length > 0
+            ? `ON CONFLICT (camp_id, blood_group) DO UPDATE SET ${updateSet}`
+            : `ON CONFLICT (camp_id, blood_group) DO NOTHING`;
+        } else {
+          const updateSet = keys
+            .filter(k => k !== pkColumn && k !== 'created_at')
+            .map(k => `${k} = EXCLUDED.${k}`)
+            .join(', ');
+          conflictClause = updateSet.length > 0
+            ? `ON CONFLICT (${pkColumn}) DO UPDATE SET ${updateSet}`
+            : `ON CONFLICT (${pkColumn}) DO NOTHING`;
+        }
 
         const query = `INSERT INTO ${table} (${colNames}) VALUES (${placeholders}) ${conflictClause};`;
         await client.query(query, values);
         processedCount++;
       } catch (rowError: any) {
         failedCount++;
-        const msg = `Skipped row with ${pkColumn}=${item[pkColumn] || 'unknown'}: ${rowError.message}`;
+        const identifier = table === 'camp_inventories' ? `${item.campId}_${item.bloodGroup}` : (item[pkColumn] || 'unknown');
+        const msg = `Skipped row in ${table} (${identifier}): ${rowError.message}`;
         console.warn(`[BloodBridge Migration Warning] ${msg}`);
         if (errorDetails.length < 5) errorDetails.push(msg);
       }

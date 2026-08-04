@@ -19,6 +19,7 @@ const INITIAL_TABLES: { table: DatabaseTable; label: string }[] = [
   { table: 'users', label: 'Registered User Profiles' },
   { table: 'camps', label: 'Blood Banks & Camps' },
   { table: 'hospitals', label: 'Registered Hospitals' },
+  { table: 'camp_inventories', label: 'Camp Blood Inventories' },
   { table: 'requests', label: 'Blood Donation Requests' },
   { table: 'comments', label: 'Clinical Comment Threads' },
   { table: 'attachments', label: 'Document Attachments' },

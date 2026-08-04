@@ -47,6 +47,25 @@ export class FirebaseAdapter implements IDatabaseClient {
       return list;
     }
 
+    // Camp inventories are nested under { [campId]: { [bloodGroup]: { units, lastUpdatedBy, lastUpdatedAt } } }
+    if (table === 'camp_inventories') {
+      Object.entries(data).forEach(([campKey, groupObj]: [string, any]) => {
+        if (groupObj && typeof groupObj === 'object') {
+          Object.entries(groupObj).forEach(([bg, itemVal]: [string, any]) => {
+            if (itemVal && typeof itemVal === 'object') {
+              list.push({
+                ...itemVal,
+                campId: itemVal.campId || campKey,
+                bloodGroup: itemVal.bloodGroup || bg,
+                id: `${campKey}_${bg}`,
+              } as T);
+            }
+          });
+        }
+      });
+      return list;
+    }
+
     // Standard flat table processing
     Object.entries(data).forEach(([key, val]: [string, any]) => {
       if (val && typeof val === 'object') {

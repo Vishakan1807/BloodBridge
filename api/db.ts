@@ -108,7 +108,8 @@ export default async function handler(req: any, res: any) {
 
       const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
       const limitClause = limit && Number.isInteger(limit) ? `LIMIT ${limit}` : 'LIMIT 1000';
-      const query = `SELECT * FROM ${table} ${whereClause} ORDER BY ${table === 'camp_inventories' ? 'last_updated_at' : 'created_at'} DESC ${limitClause};`;
+      const orderCol = table === 'camp_inventories' ? 'last_updated_at' : (table === 'audit_logs' ? 'timestamp' : 'created_at');
+      const query = `SELECT * FROM ${table} ${whereClause} ORDER BY ${orderCol} DESC ${limitClause};`;
       
       const result = await dbPool.query(query, params);
       const rows = result.rows.map(mapRowToCamel);
@@ -145,14 +146,24 @@ export default async function handler(req: any, res: any) {
       const colNames = keys.join(', ');
       const placeholders = keys.map((_, idx) => `$${idx + 1}`).join(', ');
       
-      const updateSet = keys
-        .filter(k => k !== pkColumn && k !== 'created_at')
-        .map(k => `${k} = EXCLUDED.${k}`)
-        .join(', ');
-
-      const conflictClause = updateSet.length > 0
-        ? `ON CONFLICT (${pkColumn}) DO UPDATE SET ${updateSet}`
-        : `ON CONFLICT (${pkColumn}) DO NOTHING`;
+      let conflictClause = '';
+      if (table === 'camp_inventories') {
+        const updateSet = keys
+          .filter(k => k !== 'camp_id' && k !== 'blood_group' && k !== 'created_at')
+          .map(k => `${k} = EXCLUDED.${k}`)
+          .join(', ');
+        conflictClause = updateSet.length > 0
+          ? `ON CONFLICT (camp_id, blood_group) DO UPDATE SET ${updateSet}`
+          : `ON CONFLICT (camp_id, blood_group) DO NOTHING`;
+      } else {
+        const updateSet = keys
+          .filter(k => k !== pkColumn && k !== 'created_at')
+          .map(k => `${k} = EXCLUDED.${k}`)
+          .join(', ');
+        conflictClause = updateSet.length > 0
+          ? `ON CONFLICT (${pkColumn}) DO UPDATE SET ${updateSet}`
+          : `ON CONFLICT (${pkColumn}) DO NOTHING`;
+      }
 
       const query = `INSERT INTO ${table} (${colNames}) VALUES (${placeholders}) ${conflictClause} RETURNING *;`;
       const result = await dbPool.query(query, values);
