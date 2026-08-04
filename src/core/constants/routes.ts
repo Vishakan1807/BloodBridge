@@ -36,6 +36,7 @@ export const ROUTES = {
   ADMIN_ROLES:    '/admin/roles',
   ADMIN_AUDIT:    '/admin/audit',
   ADMIN_SETTINGS: '/admin/settings',
+  ADMIN_MIGRATION: '/admin/db-migration',
 
   // Trainer Extension
   DONOR_HISTORY: '/donor/:id/history',

@@ -3,7 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, ClipboardList, ShieldCheck, Target,
   Droplet, Building2, Hospital, BarChart3, PieChart, Activity,
-  Users, KeyRound, ScrollText, Settings, Droplets,
+  Users, KeyRound, ScrollText, Settings, Droplets, Database,
   ChevronLeft, ChevronRight, LogOut, Tent,
 } from 'lucide-react';
 import { useAuth } from '@/core/context/AuthContext';
@@ -55,6 +55,7 @@ const NAV_SECTIONS: NavSection[] = [
       { label: 'Roles',      path: ROUTES.ADMIN_ROLES,    icon: <KeyRound size={18} />,  allowedRoles: ['admin'] },
       { label: 'Audit Log',  path: ROUTES.ADMIN_AUDIT,    icon: <ScrollText size={18} />,allowedRoles: ['admin'] },
       { label: 'System Config', path: ROUTES.ADMIN_SETTINGS, icon: <Settings size={18} />,  allowedRoles: ['admin'] },
+      { label: 'DB Migration',  path: ROUTES.ADMIN_MIGRATION, icon: <Database size={18} />,  allowedRoles: ['admin'] },
     ],
   },
   {

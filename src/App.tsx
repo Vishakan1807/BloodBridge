@@ -38,6 +38,7 @@ import { UserManagementPage } from '@/pages/admin/UserManagementPage';
 import { RoleAssignmentPage } from '@/pages/admin/RoleAssignmentPage';
 import { AuditLogPage }      from '@/pages/admin/AuditLogPage';
 import { SystemSettingsPage } from '@/pages/admin/SystemSettingsPage';
+import { DataMigrationPage }  from '@/pages/admin/DataMigrationPage';
 import { ProfileSettingsPage } from '@/features/settings/ProfileSettingsPage';
 import { DonorHistoryPage }    from '@/pages/donor/DonorHistoryPage';
 
@@ -104,6 +105,7 @@ const router = createBrowserRouter([
       { path: 'admin/roles',    element: <RoleGuard allow={['admin']}><RoleAssignmentPage /></RoleGuard> },
       { path: 'admin/audit',    element: <RoleGuard allow={['admin']}><AuditLogPage /></RoleGuard> },
       { path: 'admin/settings', element: <RoleGuard allow={['admin']}><SystemSettingsPage /></RoleGuard> },
+      { path: 'admin/db-migration', element: <RoleGuard allow={['admin']}><DataMigrationPage /></RoleGuard> },
 
       // Trainer Extension
       { path: 'donor/:id/history', element: <DonorHistoryPage /> },
