@@ -138,18 +138,28 @@ CREATE TABLE IF NOT EXISTS attachments (
 
 CREATE INDEX IF NOT EXISTS idx_attachments_request_id ON attachments(request_id);
 
--- 8. SYSTEM AUDIT & SECURITY LOGS
+-- 8. SYSTEM AUDIT & SECURITY LOGS (Full Coverage of Frontend & Backend Activity Records)
 CREATE TABLE IF NOT EXISTS audit_logs (
     id VARCHAR(255) PRIMARY KEY,
+    type VARCHAR(128) DEFAULT 'SYSTEM',
     event_type VARCHAR(128) DEFAULT 'GENERAL',
-    entity_id VARCHAR(255),
+    action TEXT DEFAULT '',
     actor_uid VARCHAR(255),
-    actor_name TEXT,
+    actor_name TEXT DEFAULT 'System',
+    actor_role VARCHAR(128) DEFAULT 'system',
+    target_id VARCHAR(255),
+    entity_id VARCHAR(255),
+    target_type VARCHAR(128),
+    previous_value TEXT,
+    new_value TEXT,
+    metadata TEXT,
     details TEXT,
-    created_at BIGINT DEFAULT (extract(epoch from now()) * 1000)::bigint
+    timestamp BIGINT DEFAULT (extract(epoch from now()) * 1000)::bigint,
+    created_at BIGINT DEFAULT (extract(epoch from now()) * 1000)::bigint,
+    updated_at BIGINT DEFAULT (extract(epoch from now()) * 1000)::bigint
 );
 
-CREATE INDEX IF NOT EXISTS idx_audit_logs_time_event ON audit_logs(created_at DESC, event_type);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_time_type ON audit_logs(timestamp DESC, type);
 
 -- ============================================================================
 -- End of Schema Definition. All indexes configured for fast query lookups.

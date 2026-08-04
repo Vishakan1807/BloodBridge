@@ -71,6 +71,13 @@ export default async function handler(req: any, res: any) {
       return res.status(200).json({ success: true, count: 0, message: 'No records to migrate.' });
     }
 
+    // Fetch existing PostgreSQL columns dynamically to protect against unexpected legacy NoSQL test fields
+    const colRes = await client.query(
+      "SELECT column_name FROM information_schema.columns WHERE table_name = $1 AND table_schema = 'public'",
+      [table]
+    );
+    const validColumns = new Set(colRes.rows.map((r: any) => r.column_name));
+
     const pkColumn = table === 'users' ? 'uid' : 'id';
     let processedCount = 0;
     let failedCount = 0;
@@ -78,7 +85,16 @@ export default async function handler(req: any, res: any) {
 
     for (const item of records) {
       try {
-        const snakeData = mapObjectToSnake(item, table === 'users');
+        const rawSnake = mapObjectToSnake(item, table === 'users');
+        const snakeData: Record<string, any> = {};
+        
+        // Filter attributes so only existing relational table columns are processed
+        for (const [k, v] of Object.entries(rawSnake)) {
+          if (validColumns.has(k)) {
+            snakeData[k] = v;
+          }
+        }
+
         const keys = Object.keys(snakeData);
         const values = Object.values(snakeData);
 

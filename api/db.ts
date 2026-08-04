@@ -1,10 +1,9 @@
-// Vercel Serverless Function — PostgreSQL Enterprise Database Gateway
-// Executes secure, parameterized SQL queries via connection pooling.
-// Converts camelCase JavaScript models to snake_case database schema cleanly.
+// Vercel Serverless Function — Unified PostgreSQL Database API Gateway
+// Bridges React client queries cleanly to real-world relational PostgreSQL database over secure SSL connection pools.
 
 import { Pool } from 'pg';
 
-// Global connection pool preservation across Vercel warm lambda invocations
+// Maintain a singleton connection pool across serverless cold starts
 let pool: Pool | null = null;
 
 function getPool(): Pool {
@@ -15,7 +14,7 @@ function getPool(): Pool {
     }
     pool = new Pool({
       connectionString,
-      max: 10,
+      max: 10, // Optimize for Vercel Serverless connection limitations
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 5000,
       ssl: connectionString.includes('localhost') ? false : { rejectUnauthorized: false },
@@ -24,7 +23,6 @@ function getPool(): Pool {
   return pool;
 }
 
-// Allowed table allowlist to prevent SQL injection or unauthorized access
 const ALLOWED_TABLES = new Set([
   'users',
   'camps',
@@ -36,12 +34,12 @@ const ALLOWED_TABLES = new Set([
   'audit_logs',
 ]);
 
-function camelToSnake(str: string): string {
-  return str.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
-}
-
 function snakeToCamel(str: string): string {
   return str.replace(/_([a-z0-9])/g, (_, letter) => letter.toUpperCase());
+}
+
+function camelToSnake(str: string): string {
+  return str.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
 }
 
 function mapRowToCamel(row: any): any {
@@ -57,7 +55,6 @@ function mapObjectToSnake(obj: any): any {
   if (!obj || typeof obj !== 'object') return obj;
   const result: any = {};
   for (const [key, value] of Object.entries(obj)) {
-    // Leave complex array structures as JSONB compatible objects or strings
     if (value !== undefined) {
       result[camelToSnake(key)] = value;
     }
@@ -83,7 +80,6 @@ export default async function handler(req: any, res: any) {
       return res.status(400).json({ error: `Table '${table}' is invalid or restricted.` });
     }
 
-    // Determine primary key column name per table
     const pkColumn = table === 'users' ? 'uid' : 'id';
 
     if (action === 'get') {
@@ -112,7 +108,7 @@ export default async function handler(req: any, res: any) {
 
       const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
       const limitClause = limit && Number.isInteger(limit) ? `LIMIT ${limit}` : 'LIMIT 1000';
-      const query = `SELECT * FROM ${table} ${whereClause} ORDER BY created_at DESC ${limitClause};`;
+      const query = `SELECT * FROM ${table} ${whereClause} ORDER BY ${table === 'camp_inventories' ? 'last_updated_at' : 'created_at'} DESC ${limitClause};`;
       
       const result = await dbPool.query(query, params);
       const rows = result.rows.map(mapRowToCamel);
@@ -121,7 +117,22 @@ export default async function handler(req: any, res: any) {
 
     if (action === 'upsert') {
       if (!data) return res.status(400).json({ error: 'Data object required for upsert.' });
-      const snakeData = mapObjectToSnake(data);
+      const rawSnake = mapObjectToSnake(data);
+      
+      // Dynamic column checking to protect against deprecated or unmapped frontend properties
+      const colRes = await dbPool.query(
+        "SELECT column_name FROM information_schema.columns WHERE table_name = $1 AND table_schema = 'public'",
+        [table]
+      );
+      const validColumns = new Set(colRes.rows.map((r: any) => r.column_name));
+      
+      const snakeData: Record<string, any> = {};
+      for (const [k, v] of Object.entries(rawSnake)) {
+        if (validColumns.has(k)) {
+          snakeData[k] = v;
+        }
+      }
+
       const keys = Object.keys(snakeData);
       const values = Object.values(snakeData).map(val => 
         (Array.isArray(val) || (typeof val === 'object' && val !== null && !(val instanceof Date)))
@@ -134,7 +145,6 @@ export default async function handler(req: any, res: any) {
       const colNames = keys.join(', ');
       const placeholders = keys.map((_, idx) => `$${idx + 1}`).join(', ');
       
-      // Build ON CONFLICT updates (exclude primary key from updates)
       const updateSet = keys
         .filter(k => k !== pkColumn && k !== 'created_at')
         .map(k => `${k} = EXCLUDED.${k}`)
